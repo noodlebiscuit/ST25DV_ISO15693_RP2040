@@ -11,7 +11,7 @@ rtos::Thread t2;
 volatile bool timerEvent = false;
 
 /// @brief have we detected anything on the NFC eenergy line?
-volatile bool nfcEvent = false;
+volatile bool tagDetectedEvent = false;
 
 /// @brief NFC user memory
 uint8_t tagMemory[ISO15693_USER_MEMORY];
@@ -21,52 +21,67 @@ SFE_ST25DV64KC_NDEF tag;
 
 /// ============================================================================================
 
-static volatile bool interruptChanged = false;
-
-void myISR() // Interrupt Service Routine
-{
-  interruptChanged = true;
-}
-
 ///
 /// @brief configure application
 ///
 void setup()
 {
   SERIAL_USB.begin(SERIAL_BAUD_RATE);
-  SERIAL_USB.println("Initializing...");
 
-  pinMode(GPIO_PIN_9, INPUT);
-  attachInterrupt(digitalPinToInterrupt(GPIO_PIN_9), myISR, CHANGE);
+  // attach interrupt handler to the received ST25DV GPO signal
+  OnTagDetectedInterrupt.fall(&TagDetectedInterrupt);
 
   MyWire.begin();
   if (tag.begin(MyWire))
   {
-    SERIAL_USB.println("ST25 connected...");
+
+    // The GPO registers can only be changed during an open security session
+    uint8_t password[8] = {0x00};
+    tag.openI2CSession(password);
+    tag.setGPO1Bit(BIT_GPO1_FIELD_CHANGE_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_USER_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_ACTIVITY_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_INTERRUPT_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_PUT_MSG_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_GET_MSG_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_WRITE_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_GPO_EN, true);
+
+    // Clear the first TAG of user memory
+    memset(tagMemory, 0, ISO15693_USER_MEMORY);
+
+    SERIAL_USB.println("Writing 0x0 to the first 256 bytes of user memory.");
+    tag.writeEEPROM(0x0, tagMemory, ISO15693_USER_MEMORY);
+
+    // Write the Type 5 CC File - starting at address zero
+    SERIAL_USB.println(F("Writing CC_File"));
+    tag.writeCCFile8Byte();
+
+    publish_tag();
+
+    // Read back the second NDEF UTF-8 Text record
+    char theText[40];
+    for (int i = 0; i < 12; i++)
+    {
+      if (tag.readNDEFText(theText, 40, i))
+      {
+        Serial.println(theText);
+      }
+    }
   }
 
-  // The GPO registers can only be changed during an open security session
-  uint8_t password[8] = {0x00};
-  tag.openI2CSession(password);
-  tag.setGPO1Bit(BIT_GPO1_FIELD_CHANGE_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_RF_USER_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_RF_ACTIVITY_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_RF_INTERRUPT_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_RF_PUT_MSG_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_RF_GET_MSG_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_RF_WRITE_EN, true);
-  tag.setGPO1Bit(BIT_GPO1_GPO_EN, true);
+  // start the main thread running
+  t1.start(main_thread);
 
-  // Clear the first TAG of user memory
-  memset(tagMemory, 0, ISO15693_USER_MEMORY);
+  // set the timeout value
+  timer.attach(&AtTime, TICK_RATE_MS);
+}
 
-  SERIAL_USB.println("Writing 0x0 to the first 256 bytes of user memory.");
-  tag.writeEEPROM(0x0, tagMemory, ISO15693_USER_MEMORY);
-
-  // Write the Type 5 CC File - starting at address zero
-  SERIAL_USB.println(F("Writing CC_File"));
-  tag.writeCCFile8Byte();
-
+///
+/// @brief Write CMWR record to TAG
+///
+void publish_tag()
+{
   // Write two NDEF UTF-8 Text records
   uint16_t memLoc = tag.getCCFileLen();
 
@@ -82,51 +97,6 @@ void setup()
   tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
   tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
   tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
-
-  // Read back the second NDEF UTF-8 Text record
-  char theText[40];
-
-  for (int i = 0; i < 12; i++)
-  {
-    if (tag.readNDEFText(theText, 40, i))
-    {
-      Serial.println(theText);
-    }
-  }
-
-  // The GPO registers can only be changed during an open security session
-  // uint8_t password[8] = {0x0};
-  // tag.openI2CSession(password);
-  // tag.setGPO1Bit(BIT_GPO1_FIELD_CHANGE_EN, true);
-  // tag.setGPO1Bit(BIT_GPO1_RF_USER_EN, false);
-  // tag.setGPO1Bit(BIT_GPO1_RF_ACTIVITY_EN, false);
-  // tag.setGPO1Bit(BIT_GPO1_RF_INTERRUPT_EN, false);
-  // tag.setGPO1Bit(BIT_GPO1_RF_PUT_MSG_EN, false);
-  // tag.setGPO1Bit(BIT_GPO1_RF_GET_MSG_EN, false);
-  // tag.setGPO1Bit(BIT_GPO1_RF_WRITE_EN, false);
-  // tag.setGPO1Bit(BIT_GPO1_GPO_EN, true);
-
-  // pinMode(GPIO_PIN_9, INPUT);
-  // attachInterrupt(digitalPinToInterrupt(GPIO_PIN_9), acknowledgePressedInterrupt, CHANGE);
-
-  t1.start(main_thread);
-
-  t2.start(secondary_thread);
-
-  // set the timeout value
-  timer.attach(&AtTime, TICK_RATE_MS);
-}
-
-///
-/// @brief all we do here is look to see if the card had detected a phone
-///
-void secondary_thread()
-{
-  // while (true)
-  // {
-  //   nfcEvent = tag.RFFieldDetected();
-  //   delay(500);
-  // }
 }
 
 ///
@@ -142,14 +112,22 @@ void main_thread()
       timerEvent = false;
     }
 
-    if (interruptChanged)
+    if (tagDetectedEvent)
     {
-      interruptChanged = false;
+      tagDetectedEvent = false;
       SERIAL_USB.println("-------->>> NFC EVENT");
+
+      // Read back the second NDEF UTF-8 Text record
+      // char theText[40];
+      // if (tag.readNDEFText(theText, 40, 0))
+      // {
+      //   SERIAL_USB.println(theText);
+      // }
     }
   }
 }
 
+/// @brief not used
 void loop()
 {
 }
@@ -160,4 +138,10 @@ void loop()
 void AtTime()
 {
   timerEvent = true;
+}
+
+/// @brief TAG read event has been raised on GPIO-9
+void TagDetectedInterrupt()
+{
+  tagDetectedEvent = true;
 }

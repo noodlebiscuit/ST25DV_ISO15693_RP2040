@@ -46,18 +46,19 @@ using namespace std::chrono;
 #define SCL_PIN 19
 #define WireNFC MyWire
 TwoWire MyWire(digitalPinToPinName(SDA_PIN), digitalPinToPinName(SCL_PIN));
-// ST25DV st25dv(12, -1, &MyWire);
 
 //------------------------------------------------------------------------------------------------
 
 /// <summary>
 /// MBED* Set direct write access to GPIO PIN 3 here
 /// </summary>
-// InterruptIn OnButtonPressInterupt(digitalPinToPinName(GPIO_PIN_9));
+InterruptIn OnTagDetectedInterrupt(digitalPinToPinName(GPIO_PIN_9));
 
 /// @brief MBED RTOS timer
 Ticker timer;
 
 void main_thread();
+void publish_tag();
 void secondary_thread();
+void TagDetectedInterrupt();
 void AtTime();
