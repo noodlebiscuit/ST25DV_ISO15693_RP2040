@@ -53,7 +53,7 @@ TwoWire MyWire(digitalPinToPinName(SDA_PIN), digitalPinToPinName(SCL_PIN));
 /// <summary>
 /// MBED* Set direct write access to GPIO PIN 3 here
 /// </summary>
-InterruptIn OnButtonPressInterupt(digitalPinToPinName(GPIO_PIN_9));
+// InterruptIn OnButtonPressInterupt(digitalPinToPinName(GPIO_PIN_9));
 
 /// @brief MBED RTOS timer
 Ticker timer;

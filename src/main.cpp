@@ -21,6 +21,13 @@ SFE_ST25DV64KC_NDEF tag;
 
 /// ============================================================================================
 
+static volatile bool interruptChanged = false;
+
+void myISR() // Interrupt Service Routine
+{
+  interruptChanged = true;
+}
+
 ///
 /// @brief configure application
 ///
@@ -29,11 +36,26 @@ void setup()
   SERIAL_USB.begin(SERIAL_BAUD_RATE);
   SERIAL_USB.println("Initializing...");
 
+  pinMode(GPIO_PIN_9, INPUT);
+  attachInterrupt(digitalPinToInterrupt(GPIO_PIN_9), myISR, CHANGE);
+
   MyWire.begin();
   if (tag.begin(MyWire))
   {
     SERIAL_USB.println("ST25 connected...");
   }
+
+  // The GPO registers can only be changed during an open security session
+  uint8_t password[8] = {0x00};
+  tag.openI2CSession(password);
+  tag.setGPO1Bit(BIT_GPO1_FIELD_CHANGE_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_RF_USER_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_RF_ACTIVITY_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_RF_INTERRUPT_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_RF_PUT_MSG_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_RF_GET_MSG_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_RF_WRITE_EN, true);
+  tag.setGPO1Bit(BIT_GPO1_GPO_EN, true);
 
   // Clear the first TAG of user memory
   memset(tagMemory, 0, ISO15693_USER_MEMORY);
@@ -100,11 +122,11 @@ void setup()
 ///
 void secondary_thread()
 {
-  while (true)
-  {
-    nfcEvent = tag.RFFieldDetected();
-    delay(500);
-  }
+  // while (true)
+  // {
+  //   nfcEvent = tag.RFFieldDetected();
+  //   delay(500);
+  // }
 }
 
 ///
@@ -120,9 +142,9 @@ void main_thread()
       timerEvent = false;
     }
 
-    if (nfcEvent)
+    if (interruptChanged)
     {
-      nfcEvent = false;
+      interruptChanged = false;
       SERIAL_USB.println("-------->>> NFC EVENT");
     }
   }
