@@ -38,12 +38,12 @@ void setup()
     // The GPO registers can only be changed during an open security session
     uint8_t password[8] = {0x00};
     tag.openI2CSession(password);
-    tag.setGPO1Bit(BIT_GPO1_FIELD_CHANGE_EN, true);
-    tag.setGPO1Bit(BIT_GPO1_RF_USER_EN, true);
-    tag.setGPO1Bit(BIT_GPO1_RF_ACTIVITY_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_FIELD_CHANGE_EN, false);
+    tag.setGPO1Bit(BIT_GPO1_RF_USER_EN, false);
+    tag.setGPO1Bit(BIT_GPO1_RF_ACTIVITY_EN, false);
     tag.setGPO1Bit(BIT_GPO1_RF_INTERRUPT_EN, true);
-    tag.setGPO1Bit(BIT_GPO1_RF_PUT_MSG_EN, true);
-    tag.setGPO1Bit(BIT_GPO1_RF_GET_MSG_EN, true);
+    tag.setGPO1Bit(BIT_GPO1_RF_PUT_MSG_EN, false);
+    tag.setGPO1Bit(BIT_GPO1_RF_GET_MSG_EN, false);
     tag.setGPO1Bit(BIT_GPO1_RF_WRITE_EN, true);
     tag.setGPO1Bit(BIT_GPO1_GPO_EN, true);
 
@@ -85,19 +85,23 @@ void publish_tag()
   // Write two NDEF UTF-8 Text records
   uint16_t memLoc = tag.getCCFileLen();
 
-  tag.writeNDEFText("imei:753055080000006", &memLoc, true, false);  // MB=1, ME=0
-  tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
-  tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
-  tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
-  tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-  tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-  tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
-  tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
-  tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
-  tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
-  tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
-  tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
+  tag.writeNDEFText("imei:753022080001312", &memLoc, true, true); // MB=1, ME=0
+
+  // tag.writeNDEFText("imei:753022080001312", &memLoc, true, false);  // MB=1, ME=0
+  // tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
+  // tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
+  // tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
+  // tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
+  // tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
+  // tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
+  // tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
+  // tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
+  // tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
+  // tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
+  // tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
 }
+
+volatile bool nfcread = false;
 
 ///
 /// @brief executes the PRIMARY thread
@@ -110,19 +114,32 @@ void main_thread()
     {
       SERIAL_USB.println("-------->>> SCHEDULED ACTION");
       timerEvent = false;
+
+      if (nfcread)
+      {
+        nfcread = false;
+        SERIAL_USB.println("-------->>> NFC READ >>>");
+
+        // Read 16 bytes from EEPROM location 0x0
+        uint8_t tagRead[32] = {0};
+        SERIAL_USB.print(F("Reading values, starting at location 0x0, with opened security session:        "));
+        tag.readEEPROM(0x0, tagRead, 32); // Read the EEPROM: start at address 0x0, read contents into tagRead; read 16 bytes
+        for (auto value : tagRead)        // Print the contents
+        {
+          SERIAL_USB.print(F("0x"));
+          if (value < 0x10)
+            SERIAL_USB.print(F("0"));
+          SERIAL_USB.print(value, HEX);
+          SERIAL_USB.print(F(" "));
+        }
+        SERIAL_USB.println();
+      }
     }
 
     if (tagDetectedEvent)
     {
+      nfcread = true;
       tagDetectedEvent = false;
-      SERIAL_USB.println("-------->>> NFC EVENT");
-
-      // Read back the second NDEF UTF-8 Text record
-      // char theText[40];
-      // if (tag.readNDEFText(theText, 40, 0))
-      // {
-      //   SERIAL_USB.println(theText);
-      // }
     }
   }
 }
