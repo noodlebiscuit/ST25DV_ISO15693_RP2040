@@ -129,6 +129,11 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 //------------------------------------------------------------------------------------------------
 
 #pragma region PRIVATE MEMBERS
+/// @brief commissioned command written to sensor 
+byte COMMAND_CMSD[] = {0x63, 0x6d, 0x64, 0x3a, 0x63, 0x6d, 0x73, 0x64};
+
+/// @brief ship command written to sensor
+byte COMMAND_SHIP[] = {0x63, 0x6d, 0x64, 0x3a, 0x73, 0x68, 0x69, 0x70};
 
 /// @brief detail which pins are allocated to I2C
 TwoWire MyWire(digitalPinToPinName(SDA_PIN), digitalPinToPinName(SCL_PIN));
@@ -147,7 +152,6 @@ Ticker timer;
 
 /// @brief managed serial receive buffer (non-rotating!)
 SerialBuffer<RECEIVE_BUFFER_LENGTH> _SerialBuffer;
-
 #pragma endregion
 
 //------------------------------------------------------------------------------------------------
@@ -166,6 +170,8 @@ void onBLEConnected(BLEDevice);
 void onBLEDisconnected(BLEDevice);
 void onRxCharValueUpdate(BLEDevice, BLECharacteristic);
 
+bool CheckNeedle(uint8_t*, uint8_t*, size_t, size_t);
+
 void SetupBLE();
 void StartBLE();
 
@@ -180,4 +186,10 @@ void PublishHardwareDetails();
 void PublishHexPayloadToBluetooth(uint8_t *, uint8_t *);
 void PublishResponseToBluetooth(char *, size_t);
 
+void ClearTagIdentifier();
+bool CompareTagIdentifier(uint8_t *);
+void SetTagIdentifier(uint8_t *);
+const char *HexStr(const uint8_t *, int, bool);
+char *Substring(char *, int, int);
+void InsertSubstring(char *, const char *, int);
 #pragma endregion

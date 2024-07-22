@@ -566,16 +566,6 @@ void setup()
       tag.writeCCFile8Byte();
 
       publish_tag();
-
-      // Read back the second NDEF UTF-8 Text record
-      char theText[40];
-      for (int i = 0; i < 12; i++)
-      {
-         if (tag.readNDEFText(theText, 40, i))
-         {
-            Serial.println(theText);
-         }
-      }
    }
 
    // now we setup all services within the BLE layer
@@ -597,60 +587,83 @@ void publish_tag()
    // Write two NDEF UTF-8 Text records
    uint16_t memLoc = tag.getCCFileLen();
 
-   // tag.writeNDEFText("imei:753022080001312", &memLoc, true, true); // MB=1, ME=0
+   tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
 
-   tag.writeNDEFText("imei:753022080001312", &memLoc, true, false);  // MB=1, ME=0
-   tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
-   tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
-   tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
-   tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-   tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-   tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
-   tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
-   tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
-   tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
-   tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
-   tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
+   // tag.writeNDEFText("imei:753022080001312", &memLoc, true, false);  // MB=1, ME=0
+   // tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
+   // tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
+   // tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
+   // tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
+   // tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
+   // tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
+   // tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
+   // tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
+   // tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
+   // tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
+   // tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
 }
 
-volatile bool nfcread = false;
+volatile bool reader_detected = false;
+volatile bool sensor_starting = false;
+volatile uint8_t sensor_startup_count = 0x00;
 
 ///
 /// @brief executes the PRIMARY thread
 ///
 void main_thread()
 {
+   const char *hexNotation;
+
    while (true)
    {
       if (timerEvent)
       {
-         SERIAL_USB.println("-------->>> SCHEDULED ACTION");
+
+         SERIAL_USB.print(".");
          timerEvent = false;
 
-         if (nfcread)
+         if (reader_detected & !sensor_starting)
          {
-            nfcread = false;
-            SERIAL_USB.println("-------->>> NFC READ >>>");
+            SERIAL_USB.println('*');
+            SERIAL_USB.println("READER DETECTED");
+
+            // reset the reader detected flag
+            reader_detected = false;
 
             // Read 16 bytes from EEPROM location 0x0
-            uint8_t tagRead[32] = {0};
-            SERIAL_USB.print(F("Reading values, starting at location 0x0, with opened security session:        "));
-            tag.readEEPROM(0x0, tagRead, 32); // Read the EEPROM: start at address 0x0, read contents into tagRead; read 16 bytes
-            for (auto value : tagRead)        // Print the contents
+            uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
+
+            // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
+            tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
+
+            // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
+            sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
+
+            if (sensor_starting)
             {
-               SERIAL_USB.print(F("0x"));
-               if (value < 0x10)
-                  SERIAL_USB.print(F("0"));
-               SERIAL_USB.print(value, HEX);
-               SERIAL_USB.print(F(" "));
+               // convert the TAG header into HEX NOTATION strings (as opposed to raw binary)
+               hexNotation = HexStr(tagRead, ISO15693_USER_MEMORY, HEX_UPPER_CASE);
+               SERIAL_USB.println(hexNotation);
             }
-            SERIAL_USB.println();
+         }
+
+         //
+         // if the sensor is starting we initiate a countdown of 'n' seconds
+         // during which time we DO NOT continue to read the EEPROM contents
+         //
+         if (sensor_starting)
+         {
+            if (sensor_startup_count++ > 30)
+            {
+               sensor_starting = false;
+               sensor_startup_count = 0x00;
+            }
          }
       }
 
       if (tagDetectedEvent)
       {
-         nfcread = true;
+         reader_detected = true;
          tagDetectedEvent = false;
       }
    }
@@ -705,3 +718,139 @@ void TagDetectedInterrupt()
 {
    tagDetectedEvent = true;
 }
+
+//-------------------------------------------------------------------------------------------------
+
+#pragma region STRING MANAGEMENT AND SUPPORT
+
+///
+/// @brief
+/// @param buffer source byte array to seach against
+/// @param cmd reference byte array to search for within the buffer
+/// @param buffer_length length of the buffer array
+/// @param cmd_length length of the reference array
+///
+bool CheckNeedle(uint8_t *buffer, uint8_t *cmd, size_t buffer_length, size_t cmd_length)
+{
+   std::string needle(cmd, cmd + cmd_length);
+   std::string haystack(buffer, buffer + buffer_length); // or "+ sizeof Buffer"
+   std::size_t n = haystack.find(needle);
+   return (n == std::string::npos);
+}
+
+///
+/// @brief inserts on string into another
+/// @param a source string
+/// @param b substring
+/// @param position insert position
+///
+void InsertSubstring(char *a, const char *b, int position)
+{
+   char *f, *e;
+   int length;
+
+   length = strlen(a);
+
+   f = Substring(a, 1, position - 1);
+   e = Substring(a, position, length - position + 1);
+
+   strcpy(a, "");
+   strcat(a, f);
+   free(f);
+   strcat(a, b);
+   strcat(a, e);
+   free(e);
+}
+
+///
+/// @brief
+/// @param string raw string
+/// @param position starting character index
+/// @param length number of characters to extract
+/// @return
+///
+char *Substring(char *string, int position, int length)
+{
+   char *pointer;
+   int c;
+
+   pointer = (char *)malloc(length + 1);
+
+   if (pointer == NULL)
+      exit(EXIT_FAILURE);
+
+   for (c = 0; c < length; c++)
+      *(pointer + c) = *((string + position - 1) + c);
+
+   *(pointer + c) = '\0';
+
+   return pointer;
+}
+
+///
+/// @brief converts an array of bytes into an ASCII string
+/// @brief E.g. {0x22, 0x4a, 0x0f, 0xe2} would return as '224a0fe2'
+/// @param data array of bytes
+/// @param len number of bytes to process
+/// @param uppercase return hex string with value A->F in upper case
+/// @return standard C string (array of chars)
+///
+const char *HexStr(const uint8_t *data, int len, bool uppercase)
+{
+   std::stringstream ss;
+   ss << std::hex;
+
+   for (int i(0); i < len; ++i)
+   {
+      ss << std::setw(2) << std::setfill('0') << (int)data[i];
+   }
+
+   std::string x = ss.str();
+   if (uppercase)
+   {
+      std::transform(x.begin(), x.end(), x.begin(), ::toupper);
+   }
+   return x.c_str();
+}
+
+///
+/// @brief writes the UID of the last TAG read to a global cache
+/// @param headerdata first eight bytes of an ISO 14443 (NDEF) card
+///
+// void SetTagIdentifier(uint8_t *headerdata)
+// {
+//    for (int i = 0; i < 8; i++)
+//    {
+//       NTAG_UUID[i] = headerdata[i];
+//    }
+// }
+
+///
+/// @brief inserts on string into another
+/// @param headerdata first eight bytes of an ISO 14443 (NDEF) card
+/// @return true if the eight ISO 14443 header bytes match
+///
+// bool CompareTagIdentifier(uint8_t *headerdata)
+// {
+//    uint8_t count = 0;
+//    for (uint8_t i = 0x00; i < 0x08; i++)
+//    {
+//       if (NTAG_UUID[i] == headerdata[i])
+//       {
+//          count++;
+//       }
+//    }
+//    return count >= 0x08;
+// }
+
+///
+/// @brief clear contents of the TAG identifier
+///
+// void ClearTagIdentifier()
+// {
+//    for (uint8_t i = 0x00; i < 0x08; i++)
+//    {
+//       NTAG_UUID[i] == 0x00;
+//    }
+// }
+#pragma endregion
