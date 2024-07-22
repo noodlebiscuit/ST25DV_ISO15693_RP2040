@@ -589,7 +589,7 @@ void publish_tag()
 
    //tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
 
-   tag.writeNDEFText("imei:753022080001312", &memLoc, true, false);  // MB=1, ME=0
+   tag.writeNDEFText("imei:753022080001342", &memLoc, true, false);  // MB=1, ME=0
    tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
    tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
    tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
@@ -597,7 +597,7 @@ void publish_tag()
    tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
    tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
    tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
-   tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
+   tag.writeNDEFText("cmst:ship", &memLoc, false, false);            // MB=0, ME=0
    tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
    tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
    tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
@@ -643,7 +643,7 @@ void main_thread()
          else if (sensor_starting)
          {
             SERIAL_USB.print("*");
-            if (sensor_startup_count++ > 30)
+            if (sensor_startup_count++ > 60)
             {
                sensor_startup_count = 0x00;
                sensor_starting = false;
