@@ -587,20 +587,20 @@ void publish_tag()
    // Write two NDEF UTF-8 Text records
    uint16_t memLoc = tag.getCCFileLen();
 
-   tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
+   //tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
 
-   // tag.writeNDEFText("imei:753022080001312", &memLoc, true, false);  // MB=1, ME=0
-   // tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
-   // tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
-   // tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
-   // tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-   // tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-   // tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
-   // tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
-   // tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
-   // tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
-   // tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
-   // tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
+   tag.writeNDEFText("imei:753022080001312", &memLoc, true, false);  // MB=1, ME=0
+   tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
+   tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
+   tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
+   tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
+   tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
+   tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
+   tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
+   tag.writeNDEFText("cmst:cmsd", &memLoc, false, false);            // MB=0, ME=0
+   tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
+   tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
+   tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
 }
 
 volatile bool reader_detected = false;
@@ -612,14 +612,10 @@ volatile uint8_t sensor_startup_count = 0x00;
 ///
 void main_thread()
 {
-   const char *hexNotation;
-
    while (true)
    {
       if (timerEvent)
       {
-
-         SERIAL_USB.print(".");
          timerEvent = false;
 
          if (reader_detected & !sensor_starting)
@@ -638,33 +634,33 @@ void main_thread()
 
             // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
             sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
-
-            if (sensor_starting)
-            {
-               // convert the TAG header into HEX NOTATION strings (as opposed to raw binary)
-               hexNotation = HexStr(tagRead, ISO15693_USER_MEMORY, HEX_UPPER_CASE);
-               SERIAL_USB.println(hexNotation);
-            }
          }
 
          //
          // if the sensor is starting we initiate a countdown of 'n' seconds
          // during which time we DO NOT continue to read the EEPROM contents
          //
-         if (sensor_starting)
+         else if (sensor_starting)
          {
+            SERIAL_USB.print("*");
             if (sensor_startup_count++ > 30)
             {
-               sensor_starting = false;
                sensor_startup_count = 0x00;
+               sensor_starting = false;
+               reader_detected = false;
+               tagDetectedEvent = false;
             }
          }
-      }
+         else
+         {
+            SERIAL_USB.print(".");
+         }
 
-      if (tagDetectedEvent)
-      {
-         reader_detected = true;
-         tagDetectedEvent = false;
+         if (tagDetectedEvent)
+         {
+            reader_detected = true;
+            tagDetectedEvent = false;
+         }
       }
    }
 }
@@ -735,7 +731,7 @@ bool CheckNeedle(uint8_t *buffer, uint8_t *cmd, size_t buffer_length, size_t cmd
    std::string needle(cmd, cmd + cmd_length);
    std::string haystack(buffer, buffer + buffer_length); // or "+ sizeof Buffer"
    std::size_t n = haystack.find(needle);
-   return (n == std::string::npos);
+   return (n != std::string::npos);
 }
 
 ///
