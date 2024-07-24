@@ -131,7 +131,6 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 
 //------------------------------------------------------------------------------------------------
 
-
 #define HEADER_BYTES 19           // how many bytes make up the complete SCOMP PROTOCOL header
 #define QUERY_HEADER_BYTES 10     // how many bytes in a QUERY payload form the SCOMP PROTOCOL header
 #define RESPONSE_HEADER_BYTES 10  // how many bytes in a RESPONSE payload form the SCOMP PROTOCOL header
@@ -268,12 +267,9 @@ const std::string scompCommands[CMWR_PARAMETER_COUNT] = {IMEI,
                                                          STST,
                                                          STTS};
 
-#pragma region METHOD PROTOTYPES
-
 //------------------------------------------------------------------------------------------------
 
-
-
+#pragma region METHOD PROTOTYPES
 void main_thread();
 void bluetooth_thread();
 void publish_tag();

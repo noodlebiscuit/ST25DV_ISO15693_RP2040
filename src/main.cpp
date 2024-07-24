@@ -1,38 +1,51 @@
-/// CMWR INSIGHT RAIL SENSOR SIMULATOR
-///
-/// This firmware will allow developers and testers to emulate the NFC protocol of one
-/// or more CMWR23 insight rail sensors. Communications will be via a simple ASCII text
-/// command structure passed over Bluetooth Low Energy. The command structure will be
-/// of the format detailed below:
-///
-///   [00]    - Start character ('#')
-///   [01-04] - Four character property code
-///   [15-20] - Fifteen character property body
-///
-/// The response payload will be of the format:
-///
-///   [00]    - Start character ('#')
-///   [01-02] - Two characters - "OK" or "++" on receipt of invalid property
-///
-/// Example: we wish to set the IMEI of the sensor:
-///   #imei753022080001365
-///
-/// Assuming no errors, the response from the simulator will be
-///   #OK
+/**************************************************************************************************
+ * Author: Alex Pinkerton
+ *
+ * License: (c) 2021, MIT LICENSE
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+ * and associated documentation files (the "Software"), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions: The above copyright notice and this
+ * permission notice shall be included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ *
+ * Description: main.cpp
+ * =====================
+ *
+ * The software allows you to emulate the functionality of a FEIG ECCO+ BLE NearField reader
+ * using an ARDUINO NANO 33 BLE (with a Nordic NRF-52840 Microcontroller) as well as a PN532
+ * NFC reader board from either SUNFOUNDER or ADA FRUIT.
+ *
+ * The protocol being used is the proprietary SCANNDY SComP by PANMOBIL (FEIG)
+ *
+ * No source code from either FEIG or PANMOBIL is contained in this firmware, and it is provided
+ * purely to allow engineers who are developing for the ECCO+, to be able to debug Bluetooth data
+ * at a VERY low level. It is ABSOLUTELY NOT intended for use in ANY commercial application!
+ *
+ * The author CANNOT guarantee that everything here is correct, and FEIG has no involvement with
+ * the project at ANY level.
+ *
+ * July 2023
+ *
+ ***************************************************************************************************/
 
 #include "main.h"
 
 //------------------------------------------------------------------------------------------------
 
 volatile bool _blockTimerEvents = false;
+
 volatile bool _bluetoothConnected = false;
+
 volatile bool _blockBannerText = true;
-
-/// @brief main IO application thread
-rtos::Thread t1;
-
-/// @brief secondary bluetooth thread
-rtos::Thread t2;
 
 /// @brief main thread timer event latch
 volatile bool timerEvent = false;
@@ -40,14 +53,26 @@ volatile bool timerEvent = false;
 /// @brief have we detected anything on the NFC eenergy line?
 volatile bool tagDetectedEvent = false;
 
+/// @brief  block access to the reader hardware?
+volatile bool _blockReader = false;
+
+/// @brief
+volatile bool reader_detected = false;
+
+/// @brief
+volatile bool sensor_starting = false;
+
+/// @brief main IO application thread
+rtos::Thread t1;
+
+/// @brief secondary bluetooth thread
+rtos::Thread t2;
+
 /// @brief NFC user memory
 uint8_t tagMemory[ISO15693_USER_MEMORY];
 
 /// @brief NFC tag object
 SFE_ST25DV64KC_NDEF tag;
-
-/// @brief  block access to the reader hardware?
-volatile bool _blockReader = false;
 
 /// @brief  references the UID from the TAG to block multiple reads
 uint8_t _headerdata[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -55,8 +80,7 @@ uint8_t _headerdata[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 /// @brief what command type was issued by the connected client?
 CMWR_Parameter _scomp_command = none;
 
-volatile bool reader_detected = false;
-volatile bool sensor_starting = false;
+/// @brief represent time in seconds from sensor receiving cmd:cmsd to it starting0071Q0014#tliv:3.47 2312041113ed020960
 volatile uint8_t sensor_startup_count = 0x00;
 
 //------------------------------------------------------------------------------------------------
@@ -1169,7 +1193,7 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
 
 ///
 /// @brief Process any received query
-/// @brief RUN FROM LOOP()
+/// @brief RUN FROM BLUETOOTH THREAD()
 ///
 void ProcessReceivedQueries()
 {
