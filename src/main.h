@@ -141,6 +141,8 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define QUERY_OFFSET_BYTES 4      // how many bytes should we skip before we hit the QUERY (Q) char
 #define CRC32_CHARACTERS 8        // how many ASCII HEX characters are in a CRC32
 #define RECEIVE_BUFFER_LENGTH 48  // maximum number of command bytes we can accept
+#define BLOCK_SIZE_BLE 16          // block size in bytes
+#define BLOCK_WAIT_BLE 50000       // wait 50ms between each BLE transmit packet
 
 //------------------------------------------------------------------------------------------------
 
@@ -151,6 +153,13 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 //------------------------------------------------------------------------------------------------
 
 #pragma region PRIVATE MEMBERS
+/// @brief  > RECORD HEADER
+/// @brief    These ten bytes describe both the data type as well as the total number of bytes
+uint8_t PAYLOAD_LEGTH[LENGTH_BYTES] = {0x00, 0x00};
+
+/// @brief  > END OF RECORD four byte CRC32
+uint8_t EOR[FOOTER_BYTES] = {0x00, 0x00, 0x00, 0x00};
+
 /// @brief commissioned command written to sensor
 byte COMMAND_CMSD[] = {0x63, 0x6d, 0x64, 0x3a, 0x63, 0x6d, 0x73, 0x64};
 
@@ -172,11 +181,11 @@ volatile bool _readerBusy = false;
 /// @brief MBED RTOS timer
 Ticker timer;
 
+/// @brief  calculate the CRC value of any byte or character stream
+CRC32 crc;
+
 /// @brief managed serial receive buffer (non-rotating!)
 SerialBuffer<RECEIVE_BUFFER_LENGTH> _SerialBuffer;
-
-/// @brief  > END OF RECORD four byte CRC32
-uint8_t EOR[FOOTER_BYTES] = {0x00, 0x00, 0x00, 0x00};
 
 /// @brief  > BASIC CARRIAGE RETURN \ LINE FEED
 uint8_t CR_LF[2] = {0x0d, 0x0a};

@@ -1175,70 +1175,142 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
 void ProcessReceivedQueries()
 {
 
-      // if an invalid QUERY was received, then we need to let the client know
-      if (_invalidQueryReceived & (_messageIdentifier == 0x000))
+   // if an invalid QUERY was received, then we need to let the client know
+   if (_invalidQueryReceived & (_messageIdentifier == 0x000))
+   {
+      PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
+      _queryReceived = false;
+      _invalidQueryReceived = false;
+      _messageIdentifier = 0x0000;
+      _SerialBuffer.clear();
+   }
+
+   // otherwise, return feedback and process the query
+   else if (_queryReceived & (_messageIdentifier > 0x000))
+   {
+      // load the query string into its own string for post-processing
+      char *queryBody = new char[_SerialBuffer.getLength() + 1];
+      memset(queryBody, 0, _SerialBuffer.getLength() + 1);
+      for (size_t i = 0; i < _SerialBuffer.getLength(); i++)
       {
-         //PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
-         _queryReceived = false;
-         _invalidQueryReceived = false;
-         _messageIdentifier = 0x0000;
-         _SerialBuffer.clear();
+         queryBody[i] = _SerialBuffer.get(i);
       }
 
-      // otherwise, return feedback and process the query
-      else if (_queryReceived & (_messageIdentifier > 0x000))
+      std::string search(queryBody);
+      for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
       {
-         // load the query string into its own string for post-processing
-         char *queryBody = new char[_SerialBuffer.getLength() + 1];
-         memset(queryBody, 0, _SerialBuffer.getLength() + 1);
-         for (size_t i = 0; i < _SerialBuffer.getLength(); i++)
+         if (search.find(scompCommands[i]) == 0)
          {
-            queryBody[i] = _SerialBuffer.get(i);
+            _scomp_command = CMWR_Parameter(i + 1);
+            break;
          }
+      }
 
-         std::string search(queryBody);
-         for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
+      // extract the the command payload
+      if (_scomp_command != CMWR_Parameter::none)
+      {
+         size_t colon = search.find(':');
+         char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
+
+         // #ifdef SERIAL_RECEIVE_DEBUG
+         READER_DEBUGPRINT.println(subs);
+         // #endif
+         PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+
+         // process the query command
+         switch (_scomp_command)
          {
-            if (search.find(scompCommands[i]) == 0)
-            {
-               _scomp_command = CMWR_Parameter(i + 1);
-               break;
-            }
+         case CMWR_Parameter::angl:
+            READER_DEBUGPRINT.println("ANGL");
+            break;
+         case CMWR_Parameter::apvn:
+            READER_DEBUGPRINT.println("APVN");
+            break;
+         case CMWR_Parameter::btvn:
+            READER_DEBUGPRINT.println("BTVN");
+            break;
+         case CMWR_Parameter::cmst:
+            READER_DEBUGPRINT.println("CMST");
+            break;
+         case CMWR_Parameter::hwvn:
+            READER_DEBUGPRINT.println("HWVN");
+            break;
+         case CMWR_Parameter::imei:
+            READER_DEBUGPRINT.println("IMEI");
+            break;
+         case CMWR_Parameter::mfdt:
+            READER_DEBUGPRINT.println("MFDT");
+            break;
+         case CMWR_Parameter::modl:
+            READER_DEBUGPRINT.println("MODL");
+            break;
+         case CMWR_Parameter::pmvn:
+            READER_DEBUGPRINT.println("PMVN");
+            break;
+         case CMWR_Parameter::stst:
+            READER_DEBUGPRINT.println("STST");
+            break;
+         case CMWR_Parameter::stts:
+            READER_DEBUGPRINT.println("STTS");
+            break;
+         case CMWR_Parameter::tliv:
+            READER_DEBUGPRINT.println("TLIV");
+            break;
          }
+         free(subs);
+      }
 
-         //extract the the command payload
-         if (_scomp_command != CMWR_Parameter::none)
-         {
-             size_t colon = search.find(':');
-             char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
-
-            // #ifdef SERIAL_RECEIVE_DEBUG
-            READER_DEBUGPRINT.println(subs);
-            // #endif
-            //PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
-
-            // process the query command
-            switch (_scomp_command)
-            {
-             case CMWR_Parameter::imei:
-                READER_DEBUGPRINT.println("IMEI");
-                break;
-             case CMWR_Parameter::modl:
-                READER_DEBUGPRINT.println("MODL");
-                break;
-
-            }
-
-            free(subs);
-         }
-
-         delete[] queryBody;
-         _queryReceived = false;
-         _invalidQueryReceived = false;
-         _messageIdentifier = 0x0000;
-         _SerialBuffer.clear();
- 
+      delete[] queryBody;
+      _queryReceived = false;
+      _invalidQueryReceived = false;
+      _messageIdentifier = 0x0000;
+      _SerialBuffer.clear();
    }
 }
 
+///
+/// @brief Streams the NDEF contents out over Bluetooth as a series of 16 byte packets
+/// @param message_length raw NDEF message payload
+/// @param headerdata NDEF meassage header with UUID
+///
+void PublishResponseToBluetooth(char *pagedata, size_t message_length)
+{
+   // make sure we don't have any NFC scanning overlaps here
+   _readerBusy = true;
 
+   // insert the message identified
+   for (int i = 0; i < QUERY_OFFSET_BYTES; i++)
+   {
+      scomp_ok_response_header[i] = scomp_query_ID[i];
+   }
+
+   // set the SCOMP PROTOCOL total TAG payload length
+   PAYLOAD_LEGTH[0] = (uint8_t)((message_length & 0xff00) >> 8);
+   PAYLOAD_LEGTH[1] = (uint8_t)(message_length & 0x00ff);
+
+   // insert the payload length into the SCOMP PROTOCOL RFID DATA HEADER
+   const char *payloadLength = HexStr(PAYLOAD_LEGTH, LENGTH_BYTES, HEX_UPPER_CASE);
+   for (int i = 0; i < (int)sizeof(payloadLength); i++)
+   {
+      scomp_ok_response_header[i + 5] = payloadLength[i];
+   }
+
+   // PUBLISH SCANNDY PROTOCOL HEADER TO BLUETOOTH
+   txChar.writeValue(scomp_ok_response_header, false);
+   crc.update(scomp_ok_response_header, RESPONSE_HEADER_BYTES);
+   delayMicroseconds(BLOCK_WAIT_BLE);
+
+   // PUBLISH THE PAYLOAD MESSAGE TO BLUETOOTH
+   txChar.writeValue(pagedata, false);
+   crc.update(pagedata, message_length);
+   delayMicroseconds(BLOCK_WAIT_BLE);
+
+   // publish the final CRC as an array of bytes
+   crc.finalizeAsArray(EOR);
+   const char *crcValue = HexStr(EOR, FOOTER_BYTES, HEX_UPPER_CASE);
+   txChar.writeValue(crcValue, false);
+   crc.reset();
+
+   // release the blocker
+   _readerBusy = false;
+}
