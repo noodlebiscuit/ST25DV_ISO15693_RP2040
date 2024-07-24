@@ -1089,24 +1089,23 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
          queryCRC32[CRC32_CHARACTERS] = (char)0x00;
 
          // now we extract the CRC32 from the [*queryBuffer]
-         // crc.update(queryPayload, payloadLength + QUERY_HEADER_BYTES);
-         // crc.finalizeAsArray(EOR);
+         crc.update(queryPayload, payloadLength + QUERY_HEADER_BYTES);
+         crc.finalizeAsArray(EOR);
 
          bool crcIsConfirmed = true;
          index = 0;
-
-         // for (size_t i = 0; i < FOOTER_BYTES; i++)
-         // {
-         //    valueCRC32[0] = queryCRC32[index++];
-         //    valueCRC32[1] = queryCRC32[index++];
-         //    valueCRC32[2] = '\n';
-         //    uint16_t checkValue = (uint16_t)strtol(valueCRC32, &ptr, 16);
-         //    if ((uint16_t)EOR[i] != checkValue)
-         //    {
-         //       crcIsConfirmed = false;
-         //       break;
-         //    }
-         // }
+         for (size_t i = 0; i < FOOTER_BYTES; i++)
+         {
+            valueCRC32[0] = queryCRC32[index++];
+            valueCRC32[1] = queryCRC32[index++];
+            valueCRC32[2] = '\n';
+            uint16_t checkValue = (uint16_t)strtol(valueCRC32, &ptr, 16);
+            if ((uint16_t)EOR[i] != checkValue)
+            {
+               crcIsConfirmed = false;
+               break;
+            }
+         }
 
 #ifdef SERIAL_RECEIVE_DEBUG
          READER_DEBUGPRINT.print(">> ID: [");
