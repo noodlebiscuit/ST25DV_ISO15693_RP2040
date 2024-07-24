@@ -1,13 +1,13 @@
 /// CMWR INSIGHT RAIL SENSOR SIMULATOR
 ///
-/// This firmware will allow developers and testers to emulate the NFC protocol of one 
+/// This firmware will allow developers and testers to emulate the NFC protocol of one
 /// or more CMWR23 insight rail sensors. Communications will be via a simple ASCII text
 /// command structure passed over Bluetooth Low Energy. The command structure will be
 /// of the format detailed below:
 ///
 ///   [00]    - Start character ('#')
 ///   [01-04] - Four character property code
-///   [15-20] - Fifteen character property body 
+///   [15-20] - Fifteen character property body
 ///
 /// The response payload will be of the format:
 ///
@@ -16,7 +16,7 @@
 ///
 /// Example: we wish to set the IMEI of the sensor:
 ///   #imei753022080001365
-/// 
+///
 /// Assuming no errors, the response from the simulator will be
 ///   #OK
 
@@ -52,6 +52,8 @@ volatile bool _blockReader = false;
 /// @brief  references the UID from the TAG to block multiple reads
 uint8_t _headerdata[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+/// @brief what command type was issued by the connected client?
+CMWR_Parameter _scomp_command = none;
 
 volatile bool reader_detected = false;
 volatile bool sensor_starting = false;
@@ -569,17 +571,10 @@ void ResetReader()
 {
    _readerBusy = false;
    _blockReader = false;
-   //_command = ReadCardContinuous;
    _SerialBuffer.clear();
-   //_messageIdentifier = 0x0000;
-   //_queryReceived = false;
-   //_invalidQueryReceived = false;
-   //_scomp_command = none;
-
-   //if (ndef_message->getRecordCount() > 0)
-   //{
-   //   ndef_message->dropAllRecords();
-   //}
+   _messageIdentifier = 0x0000;
+   _queryReceived = false;
+   _invalidQueryReceived = false;
 }
 #pragma endregion
 
@@ -643,7 +638,7 @@ void publish_tag()
    // Write two NDEF UTF-8 Text records
    uint16_t memLoc = tag.getCCFileLen();
 
-   //tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
+   // tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
 
    tag.writeNDEFText("imei:753022080001365", &memLoc, true, false);  // MB=1, ME=0
    tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
@@ -658,8 +653,6 @@ void publish_tag()
    tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
    tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
 }
-
-
 
 ///
 /// @brief executes the PRIMARY thread
@@ -736,9 +729,10 @@ void bluetooth_thread()
          // inner loop when connected to BLUETOOTH
          while (central.connected())
          {
-            if (timerEvent & !_blockTimerEvents)
+            if (timerEvent)
             {
                READER_DEBUGPRINT.print("+");
+               ProcessReceivedQueries();
                timerEvent = false;
             }
          }
@@ -905,9 +899,6 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 // }
 #pragma endregion
 
-
-
-
 //-------------------------------------------------------------------------------------------------
 
 // ************************************************************************************************
@@ -935,7 +926,6 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 // ************************************************************************************************
 // ************************************************************************************************
 
-
 ///
 /// @brief EVENT on data written to SPP
 /// @brief Message is of format as shown below. Initially we search for chars 'Q'  and  '#'
@@ -956,8 +946,6 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 ///
 void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
 {
-   READER_DEBUGPRINT.print("payload string: ");
-
    // at this point we don't want the reader to keep checking for Tags
    _blockReader = true;
 
@@ -1043,141 +1031,214 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
       char *queryCRC32 = new char[CRC32_CHARACTERS + 1];
       char *valueCRC32 = new char[3];
 
+      // OK, have all the required character been received yet?
+      if (totalPayloadLength == _SerialBuffer.getLength())
+      {
+         READER_DEBUGPRINT.print("payload string: ");
+         READER_DEBUGPRINT.println(payloadLengthString);
+         READER_DEBUGPRINT.print("length of command payload: ");
+         READER_DEBUGPRINT.println(payloadLength);
+         READER_DEBUGPRINT.print("total length of payload (with CRC): ");
+         READER_DEBUGPRINT.println(totalPayloadLength);
+         READER_DEBUGPRINT.print("receive buffer length: ");
+         READER_DEBUGPRINT.println(_SerialBuffer.getLength());
+
+         // clear the buffer contents again..
+         memset(buffer, 0, RECEIVE_BUFFER_LENGTH);
+         memset(queryPayload, 0, payloadLength + QUERY_HEADER_BYTES + 1);
+         memset(queryCRC32, 0, CRC32_CHARACTERS + 1);
+         memset(valueCRC32, 0, 3);
+         memset(queryID, 0, QUERY_OFFSET_BYTES + 1);
+         memset(queryBody, 0, QUERY_OFFSET_BYTES + 1);
+
+         // extract the complete complete SCOMP QUERY payload (with CRC32)
+         index = 0;
+         for (int i = startOfSequence; i < (int)(totalPayloadLength - (startOfSequence)); i++)
+         {
+            buffer[index++] = _SerialBuffer.get(i);
+         }
+
+         // extract ONLY the HEADER and the QUERY (we use this to calculate the CRC32)
+         for (int i = 0; i < payloadLength + QUERY_HEADER_BYTES; i++)
+         {
+            queryPayload[i] = buffer[i];
+         }
+         queryPayload[payloadLength + QUERY_HEADER_BYTES] = (char)0x00;
+
+         // extract only the payload body
+         for (int i = 0; i < payloadLength; i++)
+         {
+            queryBody[i] = buffer[i + QUERY_HEADER_BYTES];
+         }
+         queryBody[payloadLength] = (char)0x00;
+
+         // extract only the query message identifier
+         for (int i = 0; i < QUERY_OFFSET_BYTES; i++)
+         {
+            queryID[i] = buffer[i];
+            scomp_query_ID[i] = buffer[i];
+         }
+         queryID[QUERY_OFFSET_BYTES] = (char)0x00;
+         _messageIdentifier = (uint16_t)strtol(queryID, &ptr, 16);
+
+         // extract the embedded CRC32 value from the received SCOMP QUERY
+         for (int i = 0; i < CRC32_CHARACTERS; i++)
+         {
+            queryCRC32[i] = buffer[i + payloadLength + QUERY_HEADER_BYTES];
+         }
+         queryCRC32[CRC32_CHARACTERS] = (char)0x00;
+
+         // now we extract the CRC32 from the [*queryBuffer]
+         // crc.update(queryPayload, payloadLength + QUERY_HEADER_BYTES);
+         // crc.finalizeAsArray(EOR);
+
+         bool crcIsConfirmed = true;
+         index = 0;
+
+         // for (size_t i = 0; i < FOOTER_BYTES; i++)
+         // {
+         //    valueCRC32[0] = queryCRC32[index++];
+         //    valueCRC32[1] = queryCRC32[index++];
+         //    valueCRC32[2] = '\n';
+         //    uint16_t checkValue = (uint16_t)strtol(valueCRC32, &ptr, 16);
+         //    if ((uint16_t)EOR[i] != checkValue)
+         //    {
+         //       crcIsConfirmed = false;
+         //       break;
+         //    }
+         // }
+
 #ifdef SERIAL_RECEIVE_DEBUG
-      READER_DEBUGPRINT.print("payload string: ");
-      READER_DEBUGPRINT.println(payloadLengthString);
-      READER_DEBUGPRINT.print("length of command payload: ");
-      READER_DEBUGPRINT.println(payloadLength);
-      READER_DEBUGPRINT.print("total length of payload (with CRC): ");
-      READER_DEBUGPRINT.println(totalPayloadLength);
-      READER_DEBUGPRINT.print("receive buffer length: ");
-      READER_DEBUGPRINT.println(_SerialBuffer.getLength());
+         READER_DEBUGPRINT.print(">> ID: [");
+         READER_DEBUGPRINT.print(_messageIdentifier);
+         READER_DEBUGPRINT.print("],   query body: [");
+         READER_DEBUGPRINT.print(queryBody);
+         READER_DEBUGPRINT.print("],   CRC32: [");
+         READER_DEBUGPRINT.print(queryCRC32);
+         READER_DEBUGPRINT.print("]    REQUIRED CRC: [");
+         for (int i = 0; i < 4; i++)
+         {
+            READER_DEBUGPRINT.print(EOR[i]);
+            READER_DEBUGPRINT.print(",");
+         }
+         if (crcIsConfirmed)
+         {
+            READER_DEBUGPRINT.println(" - VALID]");
+         }
+         else
+         {
+            READER_DEBUGPRINT.println(" - INVALID]");
+         }
 #endif
 
-//       // OK, have all the required character been received yet?
-//       if (totalPayloadLength == _SerialBuffer.getLength())
-//       {
-//          // we're done
-//          // #ifdef SERIAL_RECEIVE_DEBUG
-//          READER_DEBUGPRINT.println(".");
-//          // #endif
+         if (crcIsConfirmed)
+         {
+            _queryReceived = true;
+            _SerialBuffer.clear();
+            for (size_t i = 0; i < payloadLength; i++)
+            {
+               _SerialBuffer.add(queryBody[i]);
+            }
+         }
+         else
+         {
+            _invalidQueryReceived = true;
+            _messageIdentifier = 0x0000;
+            _SerialBuffer.clear();
+         }
+      }
+      else
+      {
+#ifdef SERIAL_RECEIVE_DEBUG
+         READER_DEBUGPRINT.print(".");
+#endif
+      }
 
-//          // clear the buffer contents again..
-//          memset(buffer, 0, RECEIVE_BUFFER_LENGTH);
-//          memset(queryPayload, 0, payloadLength + QUERY_HEADER_BYTES + 1);
-//          memset(queryCRC32, 0, CRC32_CHARACTERS + 1);
-//          memset(valueCRC32, 0, 3);
-//          memset(queryID, 0, QUERY_OFFSET_BYTES + 1);
-//          memset(queryBody, 0, QUERY_OFFSET_BYTES + 1);
-
-//          // extract the complete complete SCOMP QUERY payload (with CRC32)
-//          index = 0;
-//          for (int i = startOfSequence; i < (int)(totalPayloadLength - (startOfSequence)); i++)
-//          {
-//             buffer[index++] = _SerialBuffer.get(i);
-//          }
-
-//          // extract ONLY the HEADER and the QUERY (we use this to calculate the CRC32)
-//          for (int i = 0; i < payloadLength + QUERY_HEADER_BYTES; i++)
-//          {
-//             queryPayload[i] = buffer[i];
-//          }
-//          queryPayload[payloadLength + QUERY_HEADER_BYTES] = (char)0x00;
-
-//          // extract only the payload body
-//          for (int i = 0; i < payloadLength; i++)
-//          {
-//             queryBody[i] = buffer[i + QUERY_HEADER_BYTES];
-//          }
-//          queryBody[payloadLength] = (char)0x00;
-
-//          // extract only the query message identifier
-//          for (int i = 0; i < QUERY_OFFSET_BYTES; i++)
-//          {
-//             queryID[i] = buffer[i];
-//             scomp_query_ID[i] = buffer[i];
-//          }
-//          queryID[QUERY_OFFSET_BYTES] = (char)0x00;
-//          _messageIdentifier = (uint16_t)strtol(queryID, &ptr, 16);
-
-//          // extract the embedded CRC32 value from the received SCOMP QUERY
-//          for (int i = 0; i < CRC32_CHARACTERS; i++)
-//          {
-//             queryCRC32[i] = buffer[i + payloadLength + QUERY_HEADER_BYTES];
-//          }
-//          queryCRC32[CRC32_CHARACTERS] = (char)0x00;
-
-//          // now we extract the CRC32 from the [*queryBuffer]
-//          crc.update(queryPayload, payloadLength + QUERY_HEADER_BYTES);
-//          crc.finalizeAsArray(EOR);
-
-//          bool crcIsConfirmed = true;
-//          index = 0;
-//          for (size_t i = 0; i < FOOTER_BYTES; i++)
-//          {
-//             valueCRC32[0] = queryCRC32[index++];
-//             valueCRC32[1] = queryCRC32[index++];
-//             valueCRC32[2] = '\n';
-//             uint16_t checkValue = (uint16_t)strtol(valueCRC32, &ptr, 16);
-//             if ((uint16_t)EOR[i] != checkValue)
-//             {
-//                crcIsConfirmed = false;
-//                break;
-//             }
-//          }
-
-// #ifdef SERIAL_RECEIVE_DEBUG
-//          READER_DEBUGPRINT.print(">> ID: [");
-//          READER_DEBUGPRINT.print(_messageIdentifier);
-//          READER_DEBUGPRINT.print("],   query body: [");
-//          READER_DEBUGPRINT.print(queryBody);
-//          READER_DEBUGPRINT.print("],   CRC32: [");
-//          READER_DEBUGPRINT.print(queryCRC32);
-//          READER_DEBUGPRINT.print("]    REQUIRED CRC: [");
-//          for (int i = 0; i < 4; i++)
-//          {
-//             READER_DEBUGPRINT.print(EOR[i]);
-//             READER_DEBUGPRINT.print(",");
-//          }
-//          if (crcIsConfirmed)
-//             READER_DEBUGPRINT.println(" - VALID]");
-//          else
-//             READER_DEBUGPRINT.println(" - INVALID]");
-// #endif
-
-//          if (crcIsConfirmed)
-//          {
-//             _queryReceived = true;
-//             _SerialBuffer.clear();
-//             for (size_t i = 0; i < payloadLength; i++)
-//             {
-//                _SerialBuffer.add(queryBody[i]);
-//             }
-//          }
-//          else
-//          {
-//             _invalidQueryReceived = true;
-//             _messageIdentifier = 0x0000;
-//             _SerialBuffer.clear();
-//          }
-//       }
-//       else
-//       {
-// #ifdef SERIAL_RECEIVE_DEBUG
-//          READER_DEBUGPRINT.print(".");
-// #endif
-//       }
-
-//       delete[] queryID;
-//       delete[] queryBody;
-//       delete[] valueCRC32;
-//       delete[] queryCRC32;
-//       delete[] queryPayload;
-//       delete[] payloadLengthString;
-//       delete[] buffer;
-//       crc.reset();
+      delete[] queryID;
+      delete[] queryBody;
+      delete[] valueCRC32;
+      delete[] queryCRC32;
+      delete[] queryPayload;
+      delete[] payloadLengthString;
+      delete[] buffer;
+      //       crc.reset();
 
       // enable the reader again
       _blockReader = false;
    }
 }
+
+///
+/// @brief Process any received query
+/// @brief RUN FROM LOOP()
+///
+void ProcessReceivedQueries()
+{
+
+      // if an invalid QUERY was received, then we need to let the client know
+      if (_invalidQueryReceived & (_messageIdentifier == 0x000))
+      {
+         //PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
+         _queryReceived = false;
+         _invalidQueryReceived = false;
+         _messageIdentifier = 0x0000;
+         _SerialBuffer.clear();
+      }
+
+      // otherwise, return feedback and process the query
+      else if (_queryReceived & (_messageIdentifier > 0x000))
+      {
+         // load the query string into its own string for post-processing
+         char *queryBody = new char[_SerialBuffer.getLength() + 1];
+         memset(queryBody, 0, _SerialBuffer.getLength() + 1);
+         for (size_t i = 0; i < _SerialBuffer.getLength(); i++)
+         {
+            queryBody[i] = _SerialBuffer.get(i);
+         }
+
+         std::string search(queryBody);
+         for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
+         {
+            if (search.find(scompCommands[i]) == 0)
+            {
+               _scomp_command = CMWR_Parameter(i + 1);
+               break;
+            }
+         }
+
+         //extract the the command payload
+         if (_scomp_command != CMWR_Parameter::none)
+         {
+             size_t colon = search.find(':');
+             char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
+
+            // #ifdef SERIAL_RECEIVE_DEBUG
+            READER_DEBUGPRINT.println(subs);
+            // #endif
+            //PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+
+            // process the query command
+            switch (_scomp_command)
+            {
+             case CMWR_Parameter::imei:
+                READER_DEBUGPRINT.println("IMEI");
+                break;
+             case CMWR_Parameter::modl:
+                READER_DEBUGPRINT.println("MODL");
+                break;
+
+            }
+
+            free(subs);
+         }
+
+         delete[] queryBody;
+         _queryReceived = false;
+         _invalidQueryReceived = false;
+         _messageIdentifier = 0x0000;
+         _SerialBuffer.clear();
+ 
+   }
+}
+
+

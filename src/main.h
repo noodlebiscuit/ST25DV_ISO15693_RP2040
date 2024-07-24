@@ -140,13 +140,9 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define LENGTH_BYTES 2            // how many bytes make up the CRC32 block
 #define QUERY_OFFSET_BYTES 4      // how many bytes should we skip before we hit the QUERY (Q) char
 #define CRC32_CHARACTERS 8        // how many ASCII HEX characters are in a CRC32
-#define RECEIVE_BUFFER_LENGTH 128 // maximum number of command bytes we can accept
+#define RECEIVE_BUFFER_LENGTH 48  // maximum number of command bytes we can accept
 
-
-
-
-
-
+//------------------------------------------------------------------------------------------------
 
 #define SDA_PIN 18
 #define SCL_PIN 19
@@ -178,6 +174,36 @@ Ticker timer;
 
 /// @brief managed serial receive buffer (non-rotating!)
 SerialBuffer<RECEIVE_BUFFER_LENGTH> _SerialBuffer;
+
+/// @brief  > END OF RECORD four byte CRC32
+uint8_t EOR[FOOTER_BYTES] = {0x00, 0x00, 0x00, 0x00};
+
+/// @brief  > BASIC CARRIAGE RETURN \ LINE FEED
+uint8_t CR_LF[2] = {0x0d, 0x0a};
+
+/// @brief create the default SCANNDY PROTOCOL header for returning NFC payload data
+char scomp_rfid_response_header[] = "0000R0000#rfiddata:";
+
+/// @brief create the default SCANNDY PROTOCOL header for returning an OK response
+char scomp_ok_response_header[] = "0000R0000#";
+
+/// @brief scomp query and response message identifier represented as a four character long string
+char scomp_query_ID[] = "0000";
+
+/// @brief scomp default response to a successfully received and processed query
+char scomp_response_ok[] = "ok";
+
+/// @brief scomp default response to a invalid processed query (E.g. wrong CRC32 value)
+char scomp_response_error[] = "error";
+
+/// @brief has the reader received an SCANNDY SCOMP query?
+volatile bool _queryReceived = false;
+
+/// @brief has the reader received an SCANNDY SCOMP query?
+volatile bool _invalidQueryReceived = false;
+
+/// @brief SCANNDY SCOMP message identifier as a 16 bit unsigned integer
+uint16_t _messageIdentifier = 0x0000;
 #pragma endregion
 
 //------------------------------------------------------------------------------------------------
@@ -237,6 +263,8 @@ const std::string scompCommands[CMWR_PARAMETER_COUNT] = {IMEI,
 
 //------------------------------------------------------------------------------------------------
 
+
+
 void main_thread();
 void bluetooth_thread();
 void publish_tag();
@@ -250,7 +278,7 @@ void onBLEDisconnected(BLEDevice);
 void onRxCharValueUpdate(BLEDevice, BLECharacteristic);
 
 bool CheckNeedle(uint8_t *, uint8_t *, size_t, size_t);
-
+void ProcessReceivedQueries();
 void SetupBLE();
 void StartBLE();
 void ResetReader();
