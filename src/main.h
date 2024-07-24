@@ -106,7 +106,6 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define GPIO_PIN_9 9              // GPIO pin
 #define SERIAL_BAUD_RATE 115200   // serial port baud rate
 #define SERIAL_BUFFER_SIZE 400    // how many bytes are in thes serial buffer
-#define SERIAL_USB Serial         // USB serial port (for non-debug use)
 #define ISO15693_USER_MEMORY 256  // NFC tag memory
 #define RECEIVE_BUFFER_LENGTH 128 // how many bytes in the receive buffer
 //------------------------------------------------------------------------------------------------
@@ -122,6 +121,33 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 
 //------------------------------------------------------------------------------------------------
 
+// DEBUG CONTROLLERS - REMOVE COMMENT BLOCKS TO ENABLE OUTPUT OVER SERIAL
+
+#define READER_DEBUG
+// #define READER_DEBUG_APPEND_FUNCTIONALITY
+#define SERIAL_RECEIVE_DEBUG
+#define READER_BROADCAST_DEBUG
+#define READER_DEBUGPRINT Serial
+
+//------------------------------------------------------------------------------------------------
+
+
+#define HEADER_BYTES 19           // how many bytes make up the complete SCOMP PROTOCOL header
+#define QUERY_HEADER_BYTES 10     // how many bytes in a QUERY payload form the SCOMP PROTOCOL header
+#define RESPONSE_HEADER_BYTES 10  // how many bytes in a RESPONSE payload form the SCOMP PROTOCOL header
+#define RFID_RESPONSE_BYTES 9     // how many bytes in the SCOMP RFID response data header
+#define FOOTER_BYTES 4            // how many bytes make up the CRC32 block
+#define LENGTH_BYTES 2            // how many bytes make up the CRC32 block
+#define QUERY_OFFSET_BYTES 4      // how many bytes should we skip before we hit the QUERY (Q) char
+#define CRC32_CHARACTERS 8        // how many ASCII HEX characters are in a CRC32
+#define RECEIVE_BUFFER_LENGTH 128 // maximum number of command bytes we can accept
+
+
+
+
+
+
+
 #define SDA_PIN 18
 #define SCL_PIN 19
 #define WireNFC MyWire
@@ -129,7 +155,7 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 //------------------------------------------------------------------------------------------------
 
 #pragma region PRIVATE MEMBERS
-/// @brief commissioned command written to sensor 
+/// @brief commissioned command written to sensor
 byte COMMAND_CMSD[] = {0x63, 0x6d, 0x64, 0x3a, 0x63, 0x6d, 0x73, 0x64};
 
 /// @brief ship command written to sensor
@@ -156,7 +182,60 @@ SerialBuffer<RECEIVE_BUFFER_LENGTH> _SerialBuffer;
 
 //------------------------------------------------------------------------------------------------
 
+///
+/// @brief  Describes each of the commands that this reader supports
+///
+enum CMWR_Parameter : uint8_t
+{
+    none = 0x00,
+    imei = 0x01,
+    modl = 0x02,
+    mfdt = 0x03,
+    hwvn = 0x04,
+    btvn = 0x05,
+    apvn = 0x06,
+    pmvn = 0x07,
+    angl = 0x08,
+    cmst = 0x09,
+    tliv = 0x0a,
+    stst = 0x0b,
+    stts = 0x0c
+};
+
+const size_t CMWR_PARAMETER_COUNT = 12;
+
+const char IMEI[] = "imei";
+const char MODL[] = "modl";
+const char MFDT[] = "mfdt";
+const char HWVN[] = "hwvn";
+const char BTVN[] = "btvn";
+const char APVN[] = "apvn";
+const char PMVN[] = "pmvn";
+const char ANGL[] = "angl";
+const char CMST[] = "cmst";
+const char TLIV[] = "tliv";
+const char STST[] = "stst";
+const char STTS[] = "stts";
+
+///
+/// @brief array of command strings
+///
+const std::string scompCommands[CMWR_PARAMETER_COUNT] = {IMEI,
+                                                         MODL,
+                                                         MFDT,
+                                                         HWVN,
+                                                         BTVN,
+                                                         APVN,
+                                                         PMVN,
+                                                         ANGL,
+                                                         CMST,
+                                                         TLIV,
+                                                         STST,
+                                                         STTS};
+
 #pragma region METHOD PROTOTYPES
+
+//------------------------------------------------------------------------------------------------
 
 void main_thread();
 void bluetooth_thread();
@@ -170,11 +249,11 @@ void onBLEConnected(BLEDevice);
 void onBLEDisconnected(BLEDevice);
 void onRxCharValueUpdate(BLEDevice, BLECharacteristic);
 
-bool CheckNeedle(uint8_t*, uint8_t*, size_t, size_t);
+bool CheckNeedle(uint8_t *, uint8_t *, size_t, size_t);
 
 void SetupBLE();
 void StartBLE();
-
+void ResetReader();
 void AddBatteryServiceBLE();
 void AddDataServiceBLE();
 void AddDeviceServiceBLE();

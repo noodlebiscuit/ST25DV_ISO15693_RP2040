@@ -1,3 +1,24 @@
+/// CMWR INSIGHT RAIL SENSOR SIMULATOR
+///
+/// This firmware will allow developers and testers to emulate the NFC protocol of one 
+/// or more CMWR23 insight rail sensors. Communications will be via a simple ASCII text
+/// command structure passed over Bluetooth Low Energy. The command structure will be
+/// of the format detailed below:
+///
+///   [00]    - Start character ('#')
+///   [01-04] - Four character property code
+///   [15-20] - Fifteen character property body 
+///
+/// The response payload will be of the format:
+///
+///   [00]    - Start character ('#')
+///   [01-02] - Two characters - "OK" or "++" on receipt of invalid property
+///
+/// Example: we wish to set the IMEI of the sensor:
+///   #imei753022080001365
+/// 
+/// Assuming no errors, the response from the simulator will be
+///   #OK
 
 #include "main.h"
 
@@ -24,6 +45,17 @@ uint8_t tagMemory[ISO15693_USER_MEMORY];
 
 /// @brief NFC tag object
 SFE_ST25DV64KC_NDEF tag;
+
+/// @brief  block access to the reader hardware?
+volatile bool _blockReader = false;
+
+/// @brief  references the UID from the TAG to block multiple reads
+uint8_t _headerdata[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+
+volatile bool reader_detected = false;
+volatile bool sensor_starting = false;
+volatile uint8_t sensor_startup_count = 0x00;
 
 //------------------------------------------------------------------------------------------------
 
@@ -56,13 +88,16 @@ void SetupBLE()
 
    // Event driven reads.
    // rxChar.setEventHandler(BLEWritten, onRxCharValueUpdate);
-   // rxChar.setEventHandler(BLEWritten, onBLEWritten);
+   rxChar.setEventHandler(BLEWritten, onBLEWritten);
 
    // Let's tell all local devices about us.
    BLE.advertise();
 
    // set the default characteristics
    PublishHardwareDetails();
+
+   // clear the BLE serial receive buffer
+   _SerialBuffer.clear();
 }
 
 ///
@@ -134,7 +169,8 @@ void AddDataServiceBLE()
 void onBLEConnected(BLEDevice central)
 {
    LED_SetConnectedToBLE = HIGH;
-   SERIAL_USB.println(F("Connected"));
+   ResetReader();
+   READER_DEBUGPRINT.println(F("Connected"));
 }
 
 ///
@@ -144,7 +180,7 @@ void onBLEConnected(BLEDevice central)
 void onBLEDisconnected(BLEDevice central)
 {
    LED_SetConnectedToBLE = LOW;
-   SERIAL_USB.println(F("Disconnected"));
+   READER_DEBUGPRINT.println(F("Disconnected"));
 }
 
 ///
@@ -525,6 +561,26 @@ void PublishHexUIDToBluetooth(uint8_t *headerdata)
    // release the blocker
    _readerBusy = false;
 }
+
+///
+/// @brief Reset the reader after RTOS timeout and erase the NDEF message cache
+///
+void ResetReader()
+{
+   _readerBusy = false;
+   _blockReader = false;
+   //_command = ReadCardContinuous;
+   _SerialBuffer.clear();
+   //_messageIdentifier = 0x0000;
+   //_queryReceived = false;
+   //_invalidQueryReceived = false;
+   //_scomp_command = none;
+
+   //if (ndef_message->getRecordCount() > 0)
+   //{
+   //   ndef_message->dropAllRecords();
+   //}
+}
 #pragma endregion
 
 //------------------------------------------------------------------------------------------------
@@ -534,7 +590,7 @@ void PublishHexUIDToBluetooth(uint8_t *headerdata)
 ///
 void setup()
 {
-   SERIAL_USB.begin(SERIAL_BAUD_RATE);
+   READER_DEBUGPRINT.begin(SERIAL_BAUD_RATE);
 
    // attach interrupt handler to the received ST25DV GPO signal
    OnTagDetectedInterrupt.fall(&TagDetectedInterrupt);
@@ -558,11 +614,11 @@ void setup()
       // Clear the first TAG of user memory
       memset(tagMemory, 0, ISO15693_USER_MEMORY);
 
-      SERIAL_USB.println("Writing 0x0 to the first 256 bytes of user memory.");
+      READER_DEBUGPRINT.println("Writing 0x0 to the first 256 bytes of user memory.");
       tag.writeEEPROM(0x0, tagMemory, ISO15693_USER_MEMORY);
 
       // Write the Type 5 CC File - starting at address zero
-      SERIAL_USB.println(F("Writing CC_File"));
+      READER_DEBUGPRINT.println(F("Writing CC_File"));
       tag.writeCCFile8Byte();
 
       publish_tag();
@@ -589,7 +645,7 @@ void publish_tag()
 
    //tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
 
-   tag.writeNDEFText("imei:753022080001342", &memLoc, true, false);  // MB=1, ME=0
+   tag.writeNDEFText("imei:753022080001365", &memLoc, true, false);  // MB=1, ME=0
    tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
    tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
    tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
@@ -603,9 +659,7 @@ void publish_tag()
    tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
 }
 
-volatile bool reader_detected = false;
-volatile bool sensor_starting = false;
-volatile uint8_t sensor_startup_count = 0x00;
+
 
 ///
 /// @brief executes the PRIMARY thread
@@ -614,14 +668,14 @@ void main_thread()
 {
    while (true)
    {
-      if (timerEvent)
+      if (timerEvent & !_bluetoothConnected)
       {
          timerEvent = false;
 
          if (reader_detected & !sensor_starting)
          {
-            SERIAL_USB.println('*');
-            SERIAL_USB.println("READER DETECTED");
+            READER_DEBUGPRINT.println('*');
+            READER_DEBUGPRINT.println("READER DETECTED");
 
             // reset the reader detected flag
             reader_detected = false;
@@ -642,7 +696,7 @@ void main_thread()
          //
          else if (sensor_starting)
          {
-            SERIAL_USB.print("*");
+            READER_DEBUGPRINT.print("*");
             if (sensor_startup_count++ > 60)
             {
                sensor_startup_count = 0x00;
@@ -653,7 +707,7 @@ void main_thread()
          }
          else
          {
-            SERIAL_USB.print(".");
+            READER_DEBUGPRINT.print(".");
          }
 
          if (tagDetectedEvent)
@@ -684,7 +738,7 @@ void bluetooth_thread()
          {
             if (timerEvent & !_blockTimerEvents)
             {
-               // ** Bluetooth_CheckModemForMessages();
+               READER_DEBUGPRINT.print("+");
                timerEvent = false;
             }
          }
@@ -850,3 +904,280 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 //    }
 // }
 #pragma endregion
+
+
+
+
+//-------------------------------------------------------------------------------------------------
+
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+// ************************************************************************************************
+
+
+///
+/// @brief EVENT on data written to SPP
+/// @brief Message is of format as shown below. Initially we search for chars 'Q'  and  '#'
+/// @brief
+/// @brief     ->    nnnn Q pppp # n....n cccccccc
+/// @brief
+/// @brief When we've detected this two character sequence,  we then need to move back FOUR
+/// @brief characters so that we're pointing to the characters 'PPPP' - which represent the
+/// @brief complete length of the payload as a four-character long HEX string.
+/// @brief
+/// @brief     ->    .... Q PPPP # nnnnnn cccccccc
+/// @brief
+/// @brief That done we read PPPP bytes from the input stream and take that as the message.
+/// @brief Then we take all received characters (nnnnQpppp#n....n) and calculate the CRC32.
+/// @brief Lastly we compate the two CRC32 values to determine if the query is valid
+/// @param central connected Bluetooth device
+/// @param characteristic data associated with the serial (SPP) BLE service
+///
+void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
+{
+   READER_DEBUGPRINT.print("payload string: ");
+
+   // at this point we don't want the reader to keep checking for Tags
+   _blockReader = true;
+
+   //
+   // before we do anything, we need to confirm that we're not looking at a potential buffer
+   // overrun here! If we are, then we need to flush the serial receive buffer
+   //
+   if ((characteristic.valueLength() + _SerialBuffer.getLength()) > _SerialBuffer.getSize())
+   {
+      _SerialBuffer.clear();
+   }
+
+   // that done, we should now be safe to load the received BLE data into the receive buffer
+   for (int i = 0; i < characteristic.valueLength(); i++)
+   {
+      _SerialBuffer.add(characteristic.value()[i]);
+   }
+
+   //
+   // now we need to find the start of an SCOMP QUERY. This is done by searhing for the
+   // character sequence nnnnQpppp#, where nn and pp are two character HEX strings
+   //
+   int startOfSequence = 0;
+   if (_SerialBuffer.getLength() > QUERY_HEADER_BYTES)
+   {
+      for (int i = 0; i < (_SerialBuffer.getLength() - 5); i++)
+      {
+         if ((char)_SerialBuffer.get(i) == 'Q' & (char)_SerialBuffer.get(i + 5) == '#')
+         {
+            startOfSequence = i;
+            break;
+         }
+      }
+   }
+
+   // if posn is four or above, then we have detected the start of an SCOMP QUERY string
+   if (startOfSequence >= QUERY_OFFSET_BYTES)
+   {
+      // jump back to the start of the message (to include the request ID)
+      startOfSequence -= QUERY_OFFSET_BYTES;
+
+      // we need a temporary buffer here
+      char *buffer = new char[RECEIVE_BUFFER_LENGTH];
+
+      // clear the buffer contents
+      memset(buffer, 0, RECEIVE_BUFFER_LENGTH);
+
+      // OK, lock and load, and let's see what's in the barrel!
+      int index = 0;
+      for (int i = startOfSequence; i < (int)(_SerialBuffer.getLength() - startOfSequence); i++)
+      {
+         buffer[index++] = (char)_SerialBuffer.get(i);
+      }
+
+      // get the total payload length
+      char *payloadLengthString = new char[5];
+      memset(payloadLengthString, 0, 5);
+
+      //
+      // well, it's the payload length. Now we need to covert this four character long
+      // representation of of a sixteen bit number - into an actual sixteen bit number
+      //
+      for (int i = 0; i < 4; i++)
+      {
+         payloadLengthString[i] = buffer[i + 5];
+      }
+      payloadLengthString[4] = '\n';
+
+      //
+      // now we need to convert the eight character long length string into a LONG value
+      // and then move that to a sixteen bit unsigned value
+      //
+      char *ptr;
+      uint16_t payloadLength = (uint16_t)strtol(payloadLengthString, &ptr, 16);
+
+      // But what is the total length of the message (i.e. how many chars to we need?)
+      uint16_t totalPayloadLength = payloadLength + CRC32_CHARACTERS + QUERY_HEADER_BYTES;
+
+      // we need to extract the core payloads - one with, and one without the CRC32
+      char *queryPayload = new char[payloadLength + QUERY_HEADER_BYTES + 1];
+      char *queryID = new char[QUERY_OFFSET_BYTES + 1];
+      char *queryBody = new char[payloadLength + 1];
+      char *queryCRC32 = new char[CRC32_CHARACTERS + 1];
+      char *valueCRC32 = new char[3];
+
+#ifdef SERIAL_RECEIVE_DEBUG
+      READER_DEBUGPRINT.print("payload string: ");
+      READER_DEBUGPRINT.println(payloadLengthString);
+      READER_DEBUGPRINT.print("length of command payload: ");
+      READER_DEBUGPRINT.println(payloadLength);
+      READER_DEBUGPRINT.print("total length of payload (with CRC): ");
+      READER_DEBUGPRINT.println(totalPayloadLength);
+      READER_DEBUGPRINT.print("receive buffer length: ");
+      READER_DEBUGPRINT.println(_SerialBuffer.getLength());
+#endif
+
+//       // OK, have all the required character been received yet?
+//       if (totalPayloadLength == _SerialBuffer.getLength())
+//       {
+//          // we're done
+//          // #ifdef SERIAL_RECEIVE_DEBUG
+//          READER_DEBUGPRINT.println(".");
+//          // #endif
+
+//          // clear the buffer contents again..
+//          memset(buffer, 0, RECEIVE_BUFFER_LENGTH);
+//          memset(queryPayload, 0, payloadLength + QUERY_HEADER_BYTES + 1);
+//          memset(queryCRC32, 0, CRC32_CHARACTERS + 1);
+//          memset(valueCRC32, 0, 3);
+//          memset(queryID, 0, QUERY_OFFSET_BYTES + 1);
+//          memset(queryBody, 0, QUERY_OFFSET_BYTES + 1);
+
+//          // extract the complete complete SCOMP QUERY payload (with CRC32)
+//          index = 0;
+//          for (int i = startOfSequence; i < (int)(totalPayloadLength - (startOfSequence)); i++)
+//          {
+//             buffer[index++] = _SerialBuffer.get(i);
+//          }
+
+//          // extract ONLY the HEADER and the QUERY (we use this to calculate the CRC32)
+//          for (int i = 0; i < payloadLength + QUERY_HEADER_BYTES; i++)
+//          {
+//             queryPayload[i] = buffer[i];
+//          }
+//          queryPayload[payloadLength + QUERY_HEADER_BYTES] = (char)0x00;
+
+//          // extract only the payload body
+//          for (int i = 0; i < payloadLength; i++)
+//          {
+//             queryBody[i] = buffer[i + QUERY_HEADER_BYTES];
+//          }
+//          queryBody[payloadLength] = (char)0x00;
+
+//          // extract only the query message identifier
+//          for (int i = 0; i < QUERY_OFFSET_BYTES; i++)
+//          {
+//             queryID[i] = buffer[i];
+//             scomp_query_ID[i] = buffer[i];
+//          }
+//          queryID[QUERY_OFFSET_BYTES] = (char)0x00;
+//          _messageIdentifier = (uint16_t)strtol(queryID, &ptr, 16);
+
+//          // extract the embedded CRC32 value from the received SCOMP QUERY
+//          for (int i = 0; i < CRC32_CHARACTERS; i++)
+//          {
+//             queryCRC32[i] = buffer[i + payloadLength + QUERY_HEADER_BYTES];
+//          }
+//          queryCRC32[CRC32_CHARACTERS] = (char)0x00;
+
+//          // now we extract the CRC32 from the [*queryBuffer]
+//          crc.update(queryPayload, payloadLength + QUERY_HEADER_BYTES);
+//          crc.finalizeAsArray(EOR);
+
+//          bool crcIsConfirmed = true;
+//          index = 0;
+//          for (size_t i = 0; i < FOOTER_BYTES; i++)
+//          {
+//             valueCRC32[0] = queryCRC32[index++];
+//             valueCRC32[1] = queryCRC32[index++];
+//             valueCRC32[2] = '\n';
+//             uint16_t checkValue = (uint16_t)strtol(valueCRC32, &ptr, 16);
+//             if ((uint16_t)EOR[i] != checkValue)
+//             {
+//                crcIsConfirmed = false;
+//                break;
+//             }
+//          }
+
+// #ifdef SERIAL_RECEIVE_DEBUG
+//          READER_DEBUGPRINT.print(">> ID: [");
+//          READER_DEBUGPRINT.print(_messageIdentifier);
+//          READER_DEBUGPRINT.print("],   query body: [");
+//          READER_DEBUGPRINT.print(queryBody);
+//          READER_DEBUGPRINT.print("],   CRC32: [");
+//          READER_DEBUGPRINT.print(queryCRC32);
+//          READER_DEBUGPRINT.print("]    REQUIRED CRC: [");
+//          for (int i = 0; i < 4; i++)
+//          {
+//             READER_DEBUGPRINT.print(EOR[i]);
+//             READER_DEBUGPRINT.print(",");
+//          }
+//          if (crcIsConfirmed)
+//             READER_DEBUGPRINT.println(" - VALID]");
+//          else
+//             READER_DEBUGPRINT.println(" - INVALID]");
+// #endif
+
+//          if (crcIsConfirmed)
+//          {
+//             _queryReceived = true;
+//             _SerialBuffer.clear();
+//             for (size_t i = 0; i < payloadLength; i++)
+//             {
+//                _SerialBuffer.add(queryBody[i]);
+//             }
+//          }
+//          else
+//          {
+//             _invalidQueryReceived = true;
+//             _messageIdentifier = 0x0000;
+//             _SerialBuffer.clear();
+//          }
+//       }
+//       else
+//       {
+// #ifdef SERIAL_RECEIVE_DEBUG
+//          READER_DEBUGPRINT.print(".");
+// #endif
+//       }
+
+//       delete[] queryID;
+//       delete[] queryBody;
+//       delete[] valueCRC32;
+//       delete[] queryCRC32;
+//       delete[] queryPayload;
+//       delete[] payloadLengthString;
+//       delete[] buffer;
+//       crc.reset();
+
+      // enable the reader again
+      _blockReader = false;
+   }
+}
