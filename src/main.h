@@ -213,29 +213,12 @@ volatile bool _invalidQueryReceived = false;
 
 /// @brief SCANNDY SCOMP message identifier as a 16 bit unsigned integer
 uint16_t _messageIdentifier = 0x0000;
+
+/// @brief cmwr23 sensor object
+CMWR23 sensor;
 #pragma endregion
 
 //------------------------------------------------------------------------------------------------
-
-// ///
-// /// @brief  Describes each of the commands that this reader supports
-// ///
-// enum CMWR_Parameter : uint8_t
-// {
-//     none = 0x00,
-//     imei = 0x01,
-//     modl = 0x02,
-//     mfdt = 0x03,
-//     hwvn = 0x04,
-//     btvn = 0x05,
-//     apvn = 0x06,
-//     pmvn = 0x07,
-//     angl = 0x08,
-//     cmst = 0x09,
-//     tliv = 0x0a,
-//     stst = 0x0b,
-//     stts = 0x0c
-// };
 
 const size_t CMWR_PARAMETER_COUNT = 12;
 

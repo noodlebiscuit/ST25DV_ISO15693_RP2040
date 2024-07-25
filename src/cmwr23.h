@@ -42,6 +42,19 @@ class CMWR23
 #define _STST "stst"
 #define _STTS "stts"
 
+#define _IMEI_DEFAULT "imei:753000080000000"
+#define _MODL_DEFAULT "modl:CMWR 23"
+#define _MFDT_DEFAULT "mfdt:010170"
+#define _HWVN_DEFAULT "hwvn:13"
+#define _BTVN_DEFAULT "btvn:1.13.0"
+#define _APVN_DEFAULT "apvn:1.13.0"
+#define _PMVN_DEFAULT "pmvn:0.8.0"
+#define _ANGL_DEFAULT "angl:?"
+#define _CMST_DEFAULT "cmst:ship"
+#define _TLIV_DEFAULT "tliv:3.47 2312041113"
+#define _STST_DEFAULT "stst:OK 20"
+#define _STTS_DEFAULT "stts:2401100506"
+
 private:
     std::vector<std::string> _sensorProperties;
 
@@ -52,8 +65,8 @@ public:
     /// @brief default destructor
     ~CMWR23();
 
-    void SetProperty(CMWR_Parameter, std::string);
-    std::string GetSensorProperty(CMWR_Parameter parameter);
+    void SetProperty(CMWR_Parameter, char*);
+    std::string GetSensorProperty(CMWR_Parameter);
 };
 
 #endif

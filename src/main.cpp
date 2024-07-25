@@ -662,20 +662,19 @@ void publish_tag()
    // Write two NDEF UTF-8 Text records
    uint16_t memLoc = tag.getCCFileLen();
 
-   // tag.writeNDEFText("cmd:cmsd", &memLoc, true, true); // MB=1, ME=0
-
-   tag.writeNDEFText("imei:753022080001365", &memLoc, true, false);  // MB=1, ME=0
-   tag.writeNDEFText("modl:CMWR 23", &memLoc, false, false);         // MB=0, ME=0
-   tag.writeNDEFText("mfdt:010170", &memLoc, false, false);          // MB=0, ME=0
-   tag.writeNDEFText("hwvn:13", &memLoc, false, false);              // MB=0, ME=0
-   tag.writeNDEFText("btvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-   tag.writeNDEFText("apvn:1.13.0", &memLoc, false, false);          // MB=0, ME=0
-   tag.writeNDEFText("pmvn:0.8.0", &memLoc, false, false);           // MB=0, ME=0
-   tag.writeNDEFText("angl:?", &memLoc, false, false);               // MB=0, ME=0
-   tag.writeNDEFText("cmst:ship", &memLoc, false, false);            // MB=0, ME=0
-   tag.writeNDEFText("tliv:3.47 2312041113", &memLoc, false, false); // MB=0, ME=0
-   tag.writeNDEFText("stst:OK 20", &memLoc, false, false);           // MB=0, ME=0
-   tag.writeNDEFText("stts:2401100506", &memLoc, false, true);       // MB=0, ME=1
+   // populate all other properties
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::imei).c_str(), &memLoc, true, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::modl).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::mfdt).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::hwvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::btvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::apvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::pmvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::angl).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::cmst).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::tliv).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stst).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stts).c_str(), &memLoc, false, true);
 }
 
 ///
@@ -1227,51 +1226,53 @@ void ProcessReceivedQueries()
          size_t colon = search.find(':');
          char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
 
-         // #ifdef SERIAL_RECEIVE_DEBUG
-         READER_DEBUGPRINT.println(subs);
-         // #endif
          PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+
+         sensor.SetProperty(_scomp_command,subs);
+         publish_tag();
 
          // process the query command
          switch (_scomp_command)
          {
          case CMWR_Parameter::angl:
-            READER_DEBUGPRINT.println("ANGL");
+            READER_DEBUGPRINT.print("ANGL ");
             break;
          case CMWR_Parameter::apvn:
-            READER_DEBUGPRINT.println("APVN");
+            READER_DEBUGPRINT.print("APVN ");
             break;
          case CMWR_Parameter::btvn:
-            READER_DEBUGPRINT.println("BTVN");
+            READER_DEBUGPRINT.print("BTVN ");
             break;
          case CMWR_Parameter::cmst:
-            READER_DEBUGPRINT.println("CMST");
+            READER_DEBUGPRINT.print("CMST ");
             break;
          case CMWR_Parameter::hwvn:
-            READER_DEBUGPRINT.println("HWVN");
+            READER_DEBUGPRINT.print("HWVN ");
             break;
          case CMWR_Parameter::imei:
-            READER_DEBUGPRINT.println("IMEI");
+            READER_DEBUGPRINT.print("IMEI ");
             break;
          case CMWR_Parameter::mfdt:
-            READER_DEBUGPRINT.println("MFDT");
+            READER_DEBUGPRINT.print("MFDT ");
             break;
          case CMWR_Parameter::modl:
-            READER_DEBUGPRINT.println("MODL");
+            READER_DEBUGPRINT.print("MODL ");
             break;
          case CMWR_Parameter::pmvn:
-            READER_DEBUGPRINT.println("PMVN");
+            READER_DEBUGPRINT.print("PMVN ");
             break;
          case CMWR_Parameter::stst:
-            READER_DEBUGPRINT.println("STST");
+            READER_DEBUGPRINT.print("STST ");
             break;
          case CMWR_Parameter::stts:
-            READER_DEBUGPRINT.println("STTS");
+            READER_DEBUGPRINT.print("STTS ");
             break;
          case CMWR_Parameter::tliv:
-            READER_DEBUGPRINT.println("TLIV");
+            READER_DEBUGPRINT.print("TLIV ");
             break;
          }
+
+         READER_DEBUGPRINT.println(subs);
          free(subs);
       }
 
