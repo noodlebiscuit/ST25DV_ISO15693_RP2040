@@ -72,6 +72,8 @@ void CMWR23::SetProperty(CMWR_Parameter parameter, char *value)
     _sensorProperties[(byte)parameter - 0x01] = v;
 }
 
+/// @brief returns the formatted string for a specic nfc sensor property
+/// @param parameter property to search against
 std::string CMWR23::GetSensorProperty(CMWR_Parameter parameter)
 {
     return _sensorProperties[(byte)parameter - 0x01];

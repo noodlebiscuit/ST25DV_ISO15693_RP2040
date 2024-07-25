@@ -617,7 +617,6 @@ void setup()
    MyWire.begin();
    if (tag.begin(MyWire))
    {
-
       // The GPO registers can only be changed during an open security session
       uint8_t password[8] = {0x00};
       tag.openI2CSession(password);
@@ -652,29 +651,6 @@ void setup()
 
    // set the timeout value
    timer.attach(&AtTime, TICK_RATE_MS);
-}
-
-///
-/// @brief Write CMWR record to TAG
-///
-void publish_tag()
-{
-   // Write two NDEF UTF-8 Text records
-   uint16_t memLoc = tag.getCCFileLen();
-
-   // populate all other properties
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::imei).c_str(), &memLoc, true, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::modl).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::mfdt).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::hwvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::btvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::apvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::pmvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::angl).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::cmst).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::tliv).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stst).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stts).c_str(), &memLoc, false, true);
 }
 
 ///
@@ -789,7 +765,6 @@ void TagDetectedInterrupt()
 //-------------------------------------------------------------------------------------------------
 
 #pragma region STRING MANAGEMENT AND SUPPORT
-
 ///
 /// @brief
 /// @param buffer source byte array to seach against
@@ -879,47 +854,6 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
    }
    return x.c_str();
 }
-
-///
-/// @brief writes the UID of the last TAG read to a global cache
-/// @param headerdata first eight bytes of an ISO 14443 (NDEF) card
-///
-// void SetTagIdentifier(uint8_t *headerdata)
-// {
-//    for (int i = 0; i < 8; i++)
-//    {
-//       NTAG_UUID[i] = headerdata[i];
-//    }
-// }
-
-///
-/// @brief inserts on string into another
-/// @param headerdata first eight bytes of an ISO 14443 (NDEF) card
-/// @return true if the eight ISO 14443 header bytes match
-///
-// bool CompareTagIdentifier(uint8_t *headerdata)
-// {
-//    uint8_t count = 0;
-//    for (uint8_t i = 0x00; i < 0x08; i++)
-//    {
-//       if (NTAG_UUID[i] == headerdata[i])
-//       {
-//          count++;
-//       }
-//    }
-//    return count >= 0x08;
-// }
-
-///
-/// @brief clear contents of the TAG identifier
-///
-// void ClearTagIdentifier()
-// {
-//    for (uint8_t i = 0x00; i < 0x08; i++)
-//    {
-//       NTAG_UUID[i] == 0x00;
-//    }
-// }
 #pragma endregion
 
 //-------------------------------------------------------------------------------------------------
@@ -1188,7 +1122,6 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
 ///
 void ProcessReceivedQueries()
 {
-
    // if an invalid QUERY was received, then we need to let the client know
    if (_invalidQueryReceived & (_messageIdentifier == 0x000))
    {
@@ -1226,53 +1159,56 @@ void ProcessReceivedQueries()
          size_t colon = search.find(':');
          char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
 
+         // let the calling service know that we processed the nfc property without issues
          PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
 
+         // update the sensor property and public the new object to the EEPROM
          sensor.SetProperty(_scomp_command,subs);
          publish_tag();
 
-         // process the query command
+         // DEBUG show the property type
          switch (_scomp_command)
          {
          case CMWR_Parameter::angl:
-            READER_DEBUGPRINT.print("ANGL ");
+            READER_DEBUGPRINT.print("ANGL:");
             break;
          case CMWR_Parameter::apvn:
-            READER_DEBUGPRINT.print("APVN ");
+            READER_DEBUGPRINT.print("APVN:");
             break;
          case CMWR_Parameter::btvn:
-            READER_DEBUGPRINT.print("BTVN ");
+            READER_DEBUGPRINT.print("BTVN:");
             break;
          case CMWR_Parameter::cmst:
-            READER_DEBUGPRINT.print("CMST ");
+            READER_DEBUGPRINT.print("CMST:");
             break;
          case CMWR_Parameter::hwvn:
-            READER_DEBUGPRINT.print("HWVN ");
+            READER_DEBUGPRINT.print("HWVN:");
             break;
          case CMWR_Parameter::imei:
-            READER_DEBUGPRINT.print("IMEI ");
+            READER_DEBUGPRINT.print("IMEI:");
             break;
          case CMWR_Parameter::mfdt:
-            READER_DEBUGPRINT.print("MFDT ");
+            READER_DEBUGPRINT.print("MFDT:");
             break;
          case CMWR_Parameter::modl:
-            READER_DEBUGPRINT.print("MODL ");
+            READER_DEBUGPRINT.print("MODL:");
             break;
          case CMWR_Parameter::pmvn:
-            READER_DEBUGPRINT.print("PMVN ");
+            READER_DEBUGPRINT.print("PMVN:");
             break;
          case CMWR_Parameter::stst:
-            READER_DEBUGPRINT.print("STST ");
+            READER_DEBUGPRINT.print("STST:");
             break;
          case CMWR_Parameter::stts:
-            READER_DEBUGPRINT.print("STTS ");
+            READER_DEBUGPRINT.print("STTS:");
             break;
          case CMWR_Parameter::tliv:
-            READER_DEBUGPRINT.print("TLIV ");
+            READER_DEBUGPRINT.print("TLIV:");
             break;
          }
-
+         // publish the property payload
          READER_DEBUGPRINT.println(subs);
+
          free(subs);
       }
 
@@ -1282,6 +1218,29 @@ void ProcessReceivedQueries()
       _messageIdentifier = 0x0000;
       _SerialBuffer.clear();
    }
+}
+
+///
+/// @brief Write CMWR record to TAG
+///
+void publish_tag()
+{
+   // Write two NDEF UTF-8 Text records
+   uint16_t memLoc = tag.getCCFileLen();
+
+   // populate all other properties
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::imei).c_str(), &memLoc, true, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::modl).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::mfdt).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::hwvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::btvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::apvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::pmvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::angl).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::cmst).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::tliv).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stst).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stts).c_str(), &memLoc, false, true);
 }
 
 ///
