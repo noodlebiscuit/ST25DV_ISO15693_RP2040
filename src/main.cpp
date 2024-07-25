@@ -1,4 +1,5 @@
-/**************************************************************************************************
+#pragma region LICENSE and INFORMATION 
+/*
  * Author: Alex Pinkerton
  *
  * License: (c) 2021, MIT LICENSE
@@ -80,18 +81,18 @@
  *    0071Q0009#cmst:shipf144179d
  *
  * July 2024
- *
- **************************************************************************************************/
+ **/
+#pragma endregion
+
+//-------------------------------------------------------------------------------------------------
 
 #include "main.h"
 
 //-------------------------------------------------------------------------------------------------
 
-volatile bool _blockTimerEvents = false;
-
+#pragma region STRING MANAGEMENT AND SUPPORT
+/// @brief set true when connected via bluetooth
 volatile bool _bluetoothConnected = false;
-
-volatile bool _blockBannerText = true;
 
 /// @brief main thread timer event latch
 volatile bool timerEvent = false;
@@ -102,10 +103,10 @@ volatile bool tagDetectedEvent = false;
 /// @brief  block access to the reader hardware?
 volatile bool _blockReader = false;
 
-/// @brief
+/// @brief set true with the ST25DV16 detects an RFID energy pulse
 volatile bool reader_detected = false;
 
-/// @brief
+/// @brief set true when a sensor has been commissioned and is starting
 volatile bool sensor_starting = false;
 
 /// @brief main IO application thread
@@ -128,6 +129,7 @@ CMWR_Parameter _scomp_command = none;
 
 /// @brief represent time in seconds from sensor receiving cmd:cmsd to it starting0071Q0014#tliv:3.47 2312041113ed020960
 volatile uint8_t sensor_startup_count = 0x00;
+#pragma endregion
 
 //-------------------------------------------------------------------------------------------------
 
@@ -802,7 +804,9 @@ void AtTime()
    timerEvent = true;
 }
 
+///
 /// @brief TAG read event has been raised on GPIO-9
+///
 void TagDetectedInterrupt()
 {
    tagDetectedEvent = true;
