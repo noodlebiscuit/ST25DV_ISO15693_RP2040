@@ -1058,15 +1058,6 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
       // OK, have all the required character been received yet?
       if (totalPayloadLength == _SerialBuffer.getLength())
       {
-         READER_DEBUGPRINT.print("payload string: ");
-         READER_DEBUGPRINT.println(payloadLengthString);
-         READER_DEBUGPRINT.print("length of command payload: ");
-         READER_DEBUGPRINT.println(payloadLength);
-         READER_DEBUGPRINT.print("total length of payload (with CRC): ");
-         READER_DEBUGPRINT.println(totalPayloadLength);
-         READER_DEBUGPRINT.print("receive buffer length: ");
-         READER_DEBUGPRINT.println(_SerialBuffer.getLength());
-
          // clear the buffer contents again..
          memset(buffer, 0, RECEIVE_BUFFER_LENGTH);
          memset(queryPayload, 0, payloadLength + QUERY_HEADER_BYTES + 1);
@@ -1132,13 +1123,14 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
          }
 
 #ifdef SERIAL_RECEIVE_DEBUG
+         READER_DEBUGPRINT.println(' ');
          READER_DEBUGPRINT.print(">> ID: [");
          READER_DEBUGPRINT.print(_messageIdentifier);
-         READER_DEBUGPRINT.print("],   query body: [");
+         READER_DEBUGPRINT.print("], query body: [");
          READER_DEBUGPRINT.print(queryBody);
-         READER_DEBUGPRINT.print("],   CRC32: [");
+         READER_DEBUGPRINT.print("], CRC32: [");
          READER_DEBUGPRINT.print(queryCRC32);
-         READER_DEBUGPRINT.print("]    REQUIRED CRC: [");
+         READER_DEBUGPRINT.print("]  REQUIRED CRC: [");
          for (int i = 0; i < 4; i++)
          {
             READER_DEBUGPRINT.print(EOR[i]);
@@ -1184,7 +1176,7 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
       delete[] queryPayload;
       delete[] payloadLengthString;
       delete[] buffer;
-      //       crc.reset();
+      crc.reset();
 
       // enable the reader again
       _blockReader = false;
@@ -1192,7 +1184,7 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
 }
 
 ///
-/// @brief Process any received query
+/// @brief Process any received query from the controller
 /// @brief RUN FROM BLUETOOTH THREAD()
 ///
 void ProcessReceivedQueries()

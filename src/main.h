@@ -12,6 +12,7 @@
 #include "ST25DV64KC//ST25DV64KC_Arduino_Library.h"
 #include "CRC32/SerialBuffer.h"
 #include "CRC32/CRC32.h"
+#include "CMWR23.h"
 
 #pragma once
 #include <stdint.h>
@@ -216,40 +217,40 @@ uint16_t _messageIdentifier = 0x0000;
 
 //------------------------------------------------------------------------------------------------
 
-///
-/// @brief  Describes each of the commands that this reader supports
-///
-enum CMWR_Parameter : uint8_t
-{
-    none = 0x00,
-    imei = 0x01,
-    modl = 0x02,
-    mfdt = 0x03,
-    hwvn = 0x04,
-    btvn = 0x05,
-    apvn = 0x06,
-    pmvn = 0x07,
-    angl = 0x08,
-    cmst = 0x09,
-    tliv = 0x0a,
-    stst = 0x0b,
-    stts = 0x0c
-};
+// ///
+// /// @brief  Describes each of the commands that this reader supports
+// ///
+// enum CMWR_Parameter : uint8_t
+// {
+//     none = 0x00,
+//     imei = 0x01,
+//     modl = 0x02,
+//     mfdt = 0x03,
+//     hwvn = 0x04,
+//     btvn = 0x05,
+//     apvn = 0x06,
+//     pmvn = 0x07,
+//     angl = 0x08,
+//     cmst = 0x09,
+//     tliv = 0x0a,
+//     stst = 0x0b,
+//     stts = 0x0c
+// };
 
 const size_t CMWR_PARAMETER_COUNT = 12;
 
-const char IMEI[] = "imei";
-const char MODL[] = "modl";
-const char MFDT[] = "mfdt";
-const char HWVN[] = "hwvn";
-const char BTVN[] = "btvn";
-const char APVN[] = "apvn";
-const char PMVN[] = "pmvn";
-const char ANGL[] = "angl";
-const char CMST[] = "cmst";
-const char TLIV[] = "tliv";
-const char STST[] = "stst";
-const char STTS[] = "stts";
+const char IMEI[] = _IMEI;
+const char MODL[] = _MODL;
+const char MFDT[] = _MFDT;
+const char HWVN[] = _HWVN;
+const char BTVN[] = _BTVN;
+const char APVN[] = _APVN;
+const char PMVN[] = _PMVN;
+const char ANGL[] = _ANGL;
+const char CMST[] = _CMST;
+const char TLIV[] = _TLIV;
+const char STST[] = _STST;
+const char STTS[] = _STTS;
 
 ///
 /// @brief array of command strings
@@ -270,38 +271,33 @@ const std::string scompCommands[CMWR_PARAMETER_COUNT] = {IMEI,
 //------------------------------------------------------------------------------------------------
 
 #pragma region METHOD PROTOTYPES
-void main_thread();
-void bluetooth_thread();
-void publish_tag();
-void TagDetectedInterrupt();
-void AtTime();
-
+bool CheckNeedle(uint8_t *, uint8_t *, size_t, size_t);
+bool CompareTagIdentifier(uint8_t *);
+char *Substring(char *, int, int);
+const char *HexStr(const uint8_t *, int, bool);
 size_t WriteToSPP(uint8_t);
 static void onBLEWritten(BLEDevice, BLECharacteristic);
-void onBLEConnected(BLEDevice);
-void onBLEDisconnected(BLEDevice);
-void onRxCharValueUpdate(BLEDevice, BLECharacteristic);
-
-bool CheckNeedle(uint8_t *, uint8_t *, size_t, size_t);
-void ProcessReceivedQueries();
-void SetupBLE();
-void StartBLE();
-void ResetReader();
 void AddBatteryServiceBLE();
 void AddDataServiceBLE();
 void AddDeviceServiceBLE();
-void PublishBattery();
+void AtTime();
+void bluetooth_thread();
+void InsertSubstring(char *, const char *, int);
+void main_thread();
+void onBLEConnected(BLEDevice);
+void onBLEDisconnected(BLEDevice);
+void onRxCharValueUpdate(BLEDevice, BLECharacteristic);
+void ProcessReceivedQueries();
+void publish_tag();
 void PublishBinaryPayloadToBluetooth(uint8_t *, uint8_t *);
 void PublishBinaryUIDToBluetooth(uint8_t *);
-void PublishHexUIDToBluetooth(uint8_t *);
 void PublishHardwareDetails();
 void PublishHexPayloadToBluetooth(uint8_t *, uint8_t *);
+void PublishHexUIDToBluetooth(uint8_t *);
 void PublishResponseToBluetooth(char *, size_t);
-
-void ClearTagIdentifier();
-bool CompareTagIdentifier(uint8_t *);
+void ResetReader();
 void SetTagIdentifier(uint8_t *);
-const char *HexStr(const uint8_t *, int, bool);
-char *Substring(char *, int, int);
-void InsertSubstring(char *, const char *, int);
+void SetupBLE();
+void StartBLE();
+void TagDetectedInterrupt();
 #pragma endregion
