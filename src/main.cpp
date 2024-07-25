@@ -20,26 +20,72 @@
  * Description: main.cpp
  * =====================
  *
- * The software allows you to emulate the functionality of a FEIG ECCO+ BLE NearField reader
- * using an ARDUINO NANO 33 BLE (with a Nordic NRF-52840 Microcontroller) as well as a PN532
- * NFC reader board from either SUNFOUNDER or ADA FRUIT.
+ * This firmware allows an  Arduino RP2040 and Adafruit  ST25DV16 combination to emulate the  NFC
+ * functionality of a CMWR 23 sensor. It supports updates to any of the sensor's NDEF properties, 
+ * via a validated Bluetooth link. The protocol used to transfer property data is SCANNDY's SCOMP
+ * which is detailed below: 
+ * 
+ *    Each SComP data packet is composed of three main parts: 
+ *       
+ *    1. the fixed size (10 octets) packet header 
+ *    2. variable length (up to 65535 octets) payload data 
+ *    3. the fixed size (8 octets) packet trailer
+ * 
+ *    ssssTnnnnRp....pCCCCCCCC
+ *    \__/|\__/|\____/\______/
+ *      | |  | |    |        |
+ *      | |  | |    |        8 hex digits CRC-32, covering header and payload
+ *      | |  | |    |
+ *      | |  | |    n ASCII characters of text payload data, see below
+ *      | |  | |
+ *      | |  | set to # for end-of-header flag
+ *      | |  |
+ *      | |  length n of payload data (four hex digits)
+ *      | |
+ *      | type of packet flag: 'Q' = request, 'R' = response
+ *      |
+ *      four hex digits message ID (sequence numnber), used to match related 
+ *      request/response pairs 
+ * 
+ *    Message IDs
+ *    -----------
+ *    The request generator should generate a new message ID for each request. The 
+ *    recommended implementation is a counter that is incremented for each generated 
+ *    request, but this approach is not mandatory. The receiver shall not make any 
+ *    assumptions about the algorithm generating the request message IDs. The sole 
+ *    purpose of the request message ID is to re-use it in the header of the 
+ *    corresponding response packet.
+ * 
+ *    CRC-32 
+ *    ------
+ *    The CRC-32 implementation shall use an initial value of 0xFFFFFFFF and a 
+ *    polynom of 0xEDB88320. The result shall be finalized by XORing it with 
+ *    0xFFFFFFFF.
+ * 
+ *    Examples
+ *    --------
+ *    Set the IMEI property to 753022080001365:
+ *    0068Q0014#imei:753022080001365b11a4060
+ * 
+ *    Set the IMEI property to 753022080004406:
+ *    0071Q0014#imei:753022080004406e163603d
+ *    
+ *    Set the TLIV property to 3.47 2312041113:
+ *    0071Q0014#tliv:3.47 2312041113ed020960
+ *    
+ *    Set the CMST property to cmsd (commissioned):
+ *    0071Q0009#cmst:cmsd0d61ac4f
+ *    
+ *    Set the CMST property to ship (disabled/storage ready):
+ *    0071Q0009#cmst:shipf144179d
  *
- * The protocol being used is the proprietary SCANNDY SComP by PANMOBIL (FEIG)
+ * July 2024
  *
- * No source code from either FEIG or PANMOBIL is contained in this firmware, and it is provided
- * purely to allow engineers who are developing for the ECCO+, to be able to debug Bluetooth data
- * at a VERY low level. It is ABSOLUTELY NOT intended for use in ANY commercial application!
- *
- * The author CANNOT guarantee that everything here is correct, and FEIG has no involvement with
- * the project at ANY level.
- *
- * July 2023
- *
- ***************************************************************************************************/
+ **************************************************************************************************/
 
 #include "main.h"
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 
 volatile bool _blockTimerEvents = false;
 
@@ -83,7 +129,7 @@ CMWR_Parameter _scomp_command = none;
 /// @brief represent time in seconds from sensor receiving cmd:cmsd to it starting0071Q0014#tliv:3.47 2312041113ed020960
 volatile uint8_t sensor_startup_count = 0x00;
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 
 #pragma region BLUETOOTH LOW ENERGY SUPPORT
 ///
@@ -602,7 +648,7 @@ void ResetReader()
 }
 #pragma endregion
 
-//------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 
 ///
 /// @brief configure application
