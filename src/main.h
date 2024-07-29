@@ -205,6 +205,12 @@ char scomp_response_ok[] = "ok";
 /// @brief scomp default response to a invalid processed query (E.g. wrong CRC32 value)
 char scomp_response_error[] = "error";
 
+/// @brief sensor is commissioned
+const char *CMSD = "cmsd";
+
+/// @brief sensor is disabled and can be transported
+const char *SHIP = "ship";
+
 /// @brief has the reader received an SCANNDY SCOMP query?
 volatile bool _queryReceived = false;
 
@@ -265,7 +271,6 @@ void AddDataServiceBLE();
 void AddDeviceServiceBLE();
 void AtTime();
 void bluetooth_thread();
-void CommissionSensor();
 void InsertSubstring(char *, const char *, int);
 void main_thread();
 void onBLEConnected(BLEDevice);

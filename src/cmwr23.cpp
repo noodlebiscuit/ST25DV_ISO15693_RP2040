@@ -24,7 +24,7 @@ CMWR23::~CMWR23() {};
 /// @brief set the content for a specific property
 /// @param parameter property before
 /// @param value property content
-void CMWR23::SetProperty(CMWR_Parameter parameter, char *value)
+void CMWR23::SetProperty(CMWR_Parameter parameter, const char *value)
 {
     std::string v;
     // process the query command

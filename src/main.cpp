@@ -109,6 +109,9 @@ volatile bool reader_detected = false;
 /// @brief set true when a sensor has been commissioned and is starting
 volatile bool sensor_starting = false;
 
+/// @brief set true when a sensor has been switched to standby mode
+volatile bool sensor_shutting_down = false;
+
 /// @brief main IO application thread
 rtos::Thread t1;
 
@@ -291,6 +294,7 @@ void ResetReader()
 
 //-------------------------------------------------------------------------------------------------
 
+#pragma region FIRMWARE SETUP AND THREAD MANAGEMENT
 ///
 /// @brief configure application
 ///
@@ -350,50 +354,15 @@ void main_thread()
       if (timerEvent & !_bluetoothConnected)
       {
          timerEvent = false;
-
-         if (reader_detected & !sensor_starting)
+         if (sensor_starting)
          {
-            READER_DEBUGPRINT.println('*');
-            READER_DEBUGPRINT.println("READER DETECTED");
-
-            // reset the reader detected flag
-            reader_detected = false;
-
-            // Read 16 bytes from EEPROM location 0x0
-            uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
-
-            // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
-            tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
-
-            // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
-            sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
-         }
-
-         //
-         // if the sensor is starting we initiate a countdown of 'n' seconds
-         // during which time we DO NOT continue to read the EEPROM contents
-         //
-         else if (sensor_starting)
-         {
-            READER_DEBUGPRINT.print("*");
-            if (sensor_startup_count++ > 60)
-            {
-               sensor_startup_count = 0x00;
-               sensor_starting = false;
-               reader_detected = false;
-               tagDetectedEvent = false;
-            }
+            READER_DEBUGPRINT.print("$");
          }
          else
          {
             READER_DEBUGPRINT.print(".");
          }
-
-         if (tagDetectedEvent)
-         {
-            reader_detected = true;
-            tagDetectedEvent = false;
-         }
+         SimulateSensor();
       }
    }
 }
@@ -418,7 +387,14 @@ void bluetooth_thread()
             if (timerEvent)
             {
                timerEvent = false;
-               READER_DEBUGPRINT.print("+");
+               if (sensor_starting)
+               {
+                  READER_DEBUGPRINT.print("$");
+               }
+               else
+               {
+                  READER_DEBUGPRINT.print("+");
+               }
                ProcessReceivedQueries();
                SimulateSensor();
             }
@@ -429,74 +405,6 @@ void bluetooth_thread()
          _bluetoothConnected = false;
       }
    }
-}
-
-///
-/// @brief simulate the actions of a real sensor
-///
-void SimulateSensor()
-{
-   if (!_readerBusy)
-   {
-      if (reader_detected & !sensor_starting)
-      {
-         READER_DEBUGPRINT.println('*');
-         READER_DEBUGPRINT.println("READER DETECTED");
-
-         // reset the reader detected flag
-         reader_detected = false;
-
-         // Read 16 bytes from EEPROM location 0x0
-         uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
-
-         // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
-         tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
-
-         // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
-         sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
-      }
-
-      //
-      // if the sensor is starting we initiate a countdown of 'n' seconds
-      // during which time we DO NOT continue to read the EEPROM contents
-      //
-      else if (sensor_starting)
-      {
-         READER_DEBUGPRINT.print("s");
-         if (sensor_startup_count++ > 60)
-         {
-            CommissionSensor();
-
-            sensor_startup_count = 0x00;
-            sensor_starting = false;
-            reader_detected = false;
-            tagDetectedEvent = false;
-         }
-      }
-      if (tagDetectedEvent)
-      {
-         reader_detected = true;
-         tagDetectedEvent = false;
-      }
-   }
-}
-
-///
-/// @brief Process any received query from the controller
-///
-void CommissionSensor()
-{
-   _scomp_command = CMWR_Parameter::cmst;
-   char *subs = "cmsd";
-
-   // update the sensor property and public the new object to the EEPROM
-   sensor.SetProperty(_scomp_command, subs);
-   publish_tag();
-}
-
-/// @brief not used
-void loop()
-{
 }
 
 ///
@@ -514,6 +422,10 @@ void TagDetectedInterrupt()
 {
    tagDetectedEvent = true;
 }
+
+/// @brief not used
+void loop() {}
+#pragma endregion
 
 //-------------------------------------------------------------------------------------------------
 
@@ -606,6 +518,87 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
       std::transform(x.begin(), x.end(), x.begin(), ::toupper);
    }
    return x.c_str();
+}
+#pragma endregion
+
+//-------------------------------------------------------------------------------------------------
+
+#pragma region READ AND WRITE TO NFC EEPROM - SIMULATE SENSOR
+///
+///
+/// @brief simulate the actions of a real sensor
+///
+void SimulateSensor()
+{
+   if (!_readerBusy)
+   {
+      if (reader_detected & !sensor_starting)
+      {
+         READER_DEBUGPRINT.println(" ");
+         READER_DEBUGPRINT.println("READER DETECTED");
+
+         // reset the reader detected flag
+         reader_detected = false;
+
+         // Read 16 bytes from EEPROM location 0x0
+         uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
+
+         // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
+         tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
+
+         // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
+         sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
+      }
+
+      //
+      // if the sensor is starting we initiate a countdown of 'n' seconds
+      // during which time we DO NOT continue to read the EEPROM contents
+      //
+      else if (sensor_starting)
+      {
+         if (sensor_startup_count++ > 60)
+         {
+            sensor.SetProperty(CMWR_Parameter::cmst, CMSD);
+            publish_tag();
+
+            READER_DEBUGPRINT.println(" ");
+            READER_DEBUGPRINT.println("SENSOR NOW READY");
+
+            sensor_startup_count = 0x00;
+            sensor_starting = false;
+            reader_detected = false;
+            tagDetectedEvent = false;
+         }
+      }
+      if (tagDetectedEvent)
+      {
+         reader_detected = true;
+         tagDetectedEvent = false;
+      }
+   }
+}
+
+///
+/// @brief Write CMWR record to TAG
+///
+void publish_tag()
+{
+   // Write two NDEF UTF-8 Text records
+   uint16_t memLoc = tag.getCCFileLen();
+
+   // populate all other properties
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::imei).c_str(), &memLoc, true, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::modl).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::mfdt).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::hwvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::btvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::apvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::pmvn).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::angl).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::cmst).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::tliv).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stst).c_str(), &memLoc, false, false);
+   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stts).c_str(), &memLoc, false, true);
 }
 #pragma endregion
 
@@ -971,29 +964,6 @@ void ProcessReceivedQueries()
       _messageIdentifier = 0x0000;
       _SerialBuffer.clear();
    }
-}
-
-///
-/// @brief Write CMWR record to TAG
-///
-void publish_tag()
-{
-   // Write two NDEF UTF-8 Text records
-   uint16_t memLoc = tag.getCCFileLen();
-
-   // populate all other properties
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::imei).c_str(), &memLoc, true, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::modl).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::mfdt).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::hwvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::btvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::apvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::pmvn).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::angl).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::cmst).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::tliv).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stst).c_str(), &memLoc, false, false);
-   tag.writeNDEFText(sensor.GetSensorProperty(CMWR_Parameter::stts).c_str(), &memLoc, false, true);
 }
 
 ///
