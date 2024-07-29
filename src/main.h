@@ -128,7 +128,7 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 // #define READER_DEBUG_APPEND_FUNCTIONALITY
 #define SERIAL_RECEIVE_DEBUG
 #define READER_BROADCAST_DEBUG
-#define READER_DEBUGPRINT Serial
+#define READER_DEBUG_PRINT Serial
 
 //------------------------------------------------------------------------------------------------
 

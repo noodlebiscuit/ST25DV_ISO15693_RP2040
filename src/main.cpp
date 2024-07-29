@@ -185,7 +185,7 @@ void StartBLE()
    if (!BLE.begin())
    {
 #ifdef READER_DEBUG
-      READER_DEBUGPRINT.println("starting BLE failed!");
+      READER_DEBUG_PRINT.println("starting BLE failed!");
 #endif
       while (1)
          ;
@@ -247,8 +247,8 @@ void onBLEConnected(BLEDevice central)
 {
    LED_SetConnectedToBLE = HIGH;
    ResetReader();
-   READER_DEBUGPRINT.println(" ");
-   READER_DEBUGPRINT.println(F("Connected"));
+   READER_DEBUG_PRINT.println(" ");
+   READER_DEBUG_PRINT.println(F("Connected"));
 }
 
 ///
@@ -258,8 +258,8 @@ void onBLEConnected(BLEDevice central)
 void onBLEDisconnected(BLEDevice central)
 {
    LED_SetConnectedToBLE = LOW;
-   READER_DEBUGPRINT.println(" ");
-   READER_DEBUGPRINT.println(F("Disconnected"));
+   READER_DEBUG_PRINT.println(" ");
+   READER_DEBUG_PRINT.println(F("Disconnected"));
 }
 
 ///
@@ -302,7 +302,7 @@ void ResetReader()
 ///
 void setup()
 {
-   READER_DEBUGPRINT.begin(SERIAL_BAUD_RATE);
+   READER_DEBUG_PRINT.begin(SERIAL_BAUD_RATE);
 
    // attach interrupt handler to the received ST25DV GPO signal
    OnTagDetectedInterrupt.fall(&TagDetectedInterrupt);
@@ -325,11 +325,11 @@ void setup()
       // Clear the first TAG of user memory
       memset(tagMemory, 0, ISO15693_USER_MEMORY);
 
-      READER_DEBUGPRINT.println("Writing 0x0 to the first 256 bytes of user memory.");
+      READER_DEBUG_PRINT.println("Writing 0x0 to the first 256 bytes of user memory.");
       tag.writeEEPROM(0x0, tagMemory, ISO15693_USER_MEMORY);
 
       // Write the Type 5 CC File - starting at address zero
-      READER_DEBUGPRINT.println(F("Writing CC_File"));
+      READER_DEBUG_PRINT.println(F("Writing CC_File"));
       tag.writeCCFile8Byte();
 
       publish_tag();
@@ -358,11 +358,11 @@ void main_thread()
          timerEvent = false;
          if (sensor_starting)
          {
-            READER_DEBUGPRINT.print("$");
+            READER_DEBUG_PRINT.print("$");
          }
          else
          {
-            READER_DEBUGPRINT.print(".");
+            READER_DEBUG_PRINT.print(".");
          }
          SimulateSensor();
       }
@@ -391,11 +391,11 @@ void bluetooth_thread()
                timerEvent = false;
                if (sensor_starting)
                {
-                  READER_DEBUGPRINT.print("$");
+                  READER_DEBUG_PRINT.print("$");
                }
                else
                {
-                  READER_DEBUGPRINT.print("+");
+                  READER_DEBUG_PRINT.print("+");
                }
                ProcessReceivedQueries();
                SimulateSensor();
@@ -535,8 +535,8 @@ void SimulateSensor()
    {
       if (reader_detected & !sensor_starting & !sensor_shutting_down)
       {
-         READER_DEBUGPRINT.println(" ");
-         READER_DEBUGPRINT.println("READER DETECTED");
+         READER_DEBUG_PRINT.println(" ");
+         READER_DEBUG_PRINT.println("READER DETECTED");
 
          // reset the reader detected flag
          reader_detected = false;
@@ -565,8 +565,8 @@ void SimulateSensor()
             sensor.SetProperty(CMWR_Parameter::cmst, CMSD);
             publish_tag();
 
-            READER_DEBUGPRINT.println(" ");
-            READER_DEBUGPRINT.println("SENSOR NOW READY");
+            READER_DEBUG_PRINT.println(" ");
+            READER_DEBUG_PRINT.println("SENSOR NOW READY");
 
             sensor_startup_count = 0x00;
             sensor_starting = false;
@@ -593,8 +593,8 @@ void SimulateSensor()
             sensor.SetProperty(CMWR_Parameter::cmst, SHIP);
             publish_tag();
 
-            READER_DEBUGPRINT.println(" ");
-            READER_DEBUGPRINT.println("SENSOR NOW DISABLED");
+            READER_DEBUG_PRINT.println(" ");
+            READER_DEBUG_PRINT.println("SENSOR NOW DISABLED");
 
             sensor_startup_count = 0x00;
             sensor_starting = false;
@@ -843,26 +843,26 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
          }
 
 #ifdef SERIAL_RECEIVE_DEBUG
-         READER_DEBUGPRINT.println(' ');
-         READER_DEBUGPRINT.print(">> ID: [");
-         READER_DEBUGPRINT.print(_messageIdentifier);
-         READER_DEBUGPRINT.print("], query body: [");
-         READER_DEBUGPRINT.print(queryBody);
-         READER_DEBUGPRINT.print("], CRC32: [");
-         READER_DEBUGPRINT.print(queryCRC32);
-         READER_DEBUGPRINT.print("]  REQUIRED CRC: [");
+         READER_DEBUG_PRINT.println(' ');
+         READER_DEBUG_PRINT.print(">> ID: [");
+         READER_DEBUG_PRINT.print(_messageIdentifier);
+         READER_DEBUG_PRINT.print("], query body: [");
+         READER_DEBUG_PRINT.print(queryBody);
+         READER_DEBUG_PRINT.print("], CRC32: [");
+         READER_DEBUG_PRINT.print(queryCRC32);
+         READER_DEBUG_PRINT.print("]  REQUIRED CRC: [");
          for (int i = 0; i < 4; i++)
          {
-            READER_DEBUGPRINT.print(EOR[i]);
-            READER_DEBUGPRINT.print(",");
+            READER_DEBUG_PRINT.print(EOR[i]);
+            READER_DEBUG_PRINT.print(",");
          }
          if (crcIsConfirmed)
          {
-            READER_DEBUGPRINT.println(" - VALID]");
+            READER_DEBUG_PRINT.println(" - VALID]");
          }
          else
          {
-            READER_DEBUGPRINT.println(" - INVALID]");
+            READER_DEBUG_PRINT.println(" - INVALID]");
          }
 #endif
 
@@ -885,7 +885,7 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
       else
       {
 #ifdef SERIAL_RECEIVE_DEBUG
-         READER_DEBUGPRINT.print(".");
+         READER_DEBUG_PRINT.print(".");
 #endif
       }
 
@@ -957,44 +957,44 @@ void ProcessReceivedQueries()
          switch (_scomp_command)
          {
          case CMWR_Parameter::angl:
-            READER_DEBUGPRINT.print("ANGL:");
+            READER_DEBUG_PRINT.print("ANGL:");
             break;
          case CMWR_Parameter::apvn:
-            READER_DEBUGPRINT.print("APVN:");
+            READER_DEBUG_PRINT.print("APVN:");
             break;
          case CMWR_Parameter::btvn:
-            READER_DEBUGPRINT.print("BTVN:");
+            READER_DEBUG_PRINT.print("BTVN:");
             break;
          case CMWR_Parameter::cmst:
-            READER_DEBUGPRINT.print("CMST:");
+            READER_DEBUG_PRINT.print("CMST:");
             break;
          case CMWR_Parameter::hwvn:
-            READER_DEBUGPRINT.print("HWVN:");
+            READER_DEBUG_PRINT.print("HWVN:");
             break;
          case CMWR_Parameter::imei:
-            READER_DEBUGPRINT.print("IMEI:");
+            READER_DEBUG_PRINT.print("IMEI:");
             break;
          case CMWR_Parameter::mfdt:
-            READER_DEBUGPRINT.print("MFDT:");
+            READER_DEBUG_PRINT.print("MFDT:");
             break;
          case CMWR_Parameter::modl:
-            READER_DEBUGPRINT.print("MODL:");
+            READER_DEBUG_PRINT.print("MODL:");
             break;
          case CMWR_Parameter::pmvn:
-            READER_DEBUGPRINT.print("PMVN:");
+            READER_DEBUG_PRINT.print("PMVN:");
             break;
          case CMWR_Parameter::stst:
-            READER_DEBUGPRINT.print("STST:");
+            READER_DEBUG_PRINT.print("STST:");
             break;
          case CMWR_Parameter::stts:
-            READER_DEBUGPRINT.print("STTS:");
+            READER_DEBUG_PRINT.print("STTS:");
             break;
          case CMWR_Parameter::tliv:
-            READER_DEBUGPRINT.print("TLIV:");
+            READER_DEBUG_PRINT.print("TLIV:");
             break;
          }
          // publish the property payload
-         READER_DEBUGPRINT.println(subs);
+         READER_DEBUG_PRINT.println(subs);
 
          free(subs);
       }
