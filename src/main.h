@@ -132,17 +132,19 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 
 //------------------------------------------------------------------------------------------------
 
-#define HEADER_BYTES 19           // how many bytes make up the complete SCOMP PROTOCOL header
-#define QUERY_HEADER_BYTES 10     // how many bytes in a QUERY payload form the SCOMP PROTOCOL header
-#define RESPONSE_HEADER_BYTES 10  // how many bytes in a RESPONSE payload form the SCOMP PROTOCOL header
-#define RFID_RESPONSE_BYTES 9     // how many bytes in the SCOMP RFID response data header
-#define FOOTER_BYTES 4            // how many bytes make up the CRC32 block
-#define LENGTH_BYTES 2            // how many bytes make up the CRC32 block
-#define QUERY_OFFSET_BYTES 4      // how many bytes should we skip before we hit the QUERY (Q) char
-#define CRC32_CHARACTERS 8        // how many ASCII HEX characters are in a CRC32
-#define RECEIVE_BUFFER_LENGTH 48  // maximum number of command bytes we can accept
-#define BLOCK_SIZE_BLE 16          // block size in bytes
-#define BLOCK_WAIT_BLE 50000       // wait 50ms between each BLE transmit packet
+#define HEADER_BYTES 19          // how many bytes make up the complete SCOMP PROTOCOL header
+#define QUERY_HEADER_BYTES 10    // how many bytes in a QUERY payload form the SCOMP PROTOCOL header
+#define RESPONSE_HEADER_BYTES 10 // how many bytes in a RESPONSE payload form the SCOMP PROTOCOL header
+#define RFID_RESPONSE_BYTES 9    // how many bytes in the SCOMP RFID response data header
+#define FOOTER_BYTES 4           // how many bytes make up the CRC32 block
+#define LENGTH_BYTES 2           // how many bytes make up the CRC32 block
+#define QUERY_OFFSET_BYTES 4     // how many bytes should we skip before we hit the QUERY (Q) char
+#define CRC32_CHARACTERS 8       // how many ASCII HEX characters are in a CRC32
+#define RECEIVE_BUFFER_LENGTH 48 // maximum number of command bytes we can accept
+#define BLOCK_SIZE_BLE 16        // block size in bytes
+#define BLOCK_WAIT_BLE 50000     // wait 50ms between each BLE transmit packet
+#define SENSOR_STARTUP_TIME 120  // time in seconds for the CMWR32 sensor to start
+#define SENSOR_SHUTDOWN_TIME 30  // time in seconds for the CMWR32 sensor to shutdown
 
 //------------------------------------------------------------------------------------------------
 
@@ -204,6 +206,12 @@ char scomp_response_ok[] = "ok";
 
 /// @brief scomp default response to a invalid processed query (E.g. wrong CRC32 value)
 char scomp_response_error[] = "error";
+
+/// @brief scomp default response to a sensor being enabled
+char scomp_response_sensor_enabled[] = "sensor enabled";
+
+/// @brief scomp default response to a sensor being disabled
+char scomp_response_sensor_disabled[] = "sensor disabled";
 
 /// @brief sensor is commissioned
 const char *CMSD = "cmsd";

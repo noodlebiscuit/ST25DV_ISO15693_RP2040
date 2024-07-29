@@ -560,7 +560,7 @@ void SimulateSensor()
       //
       else if (sensor_starting & !sensor_shutting_down)
       {
-         if (sensor_startup_count++ > 60)
+         if (sensor_startup_count++ > SENSOR_STARTUP_TIME)
          {
             sensor.SetProperty(CMWR_Parameter::cmst, CMSD);
             publish_tag();
@@ -573,16 +573,22 @@ void SimulateSensor()
             sensor_shutting_down = false;
             reader_detected = false;
             tagDetectedEvent = false;
+
+            if (_bluetoothConnected)
+            {
+               PublishResponseToBluetooth(scomp_response_sensor_enabled,
+                                          sizeof(scomp_response_sensor_enabled) - 1);
+            }
          }
       }
 
       //
       // the same for when the sensor is shutting down, except now we only
-      // apply a nominal shutdown period of 10 seconds
+      // apply a nominal shutdown period of 30 seconds
       //
       else if (!sensor_starting & sensor_shutting_down)
       {
-         if (sensor_startup_count++ > 10)
+         if (sensor_startup_count++ > SENSOR_SHUTDOWN_TIME)
          {
             sensor.SetProperty(CMWR_Parameter::cmst, SHIP);
             publish_tag();
@@ -595,6 +601,12 @@ void SimulateSensor()
             sensor_shutting_down = false;
             reader_detected = false;
             tagDetectedEvent = false;
+
+            if (_bluetoothConnected)
+            {
+               PublishResponseToBluetooth(scomp_response_sensor_disabled,
+                                          sizeof(scomp_response_sensor_disabled) - 1);
+            }
          }
       }
 
@@ -657,6 +669,7 @@ void publish_tag()
 // ************************************************************************************************
 // ************************************************************************************************
 
+#pragma region BLUETOOTH MESSAGE PROCESSING
 ///
 /// @brief EVENT on data written to SPP
 /// @brief Message is of format as shown below. Initially we search for chars 'Q'  and  '#'
@@ -1040,3 +1053,6 @@ void PublishResponseToBluetooth(char *pagedata, size_t message_length)
    // release the blocker
    _readerBusy = false;
 }
+#pragma endregion
+
+//-------------------------------------------------------------------------------------------------
