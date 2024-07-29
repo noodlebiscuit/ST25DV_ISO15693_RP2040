@@ -247,6 +247,7 @@ void onBLEConnected(BLEDevice central)
 {
    LED_SetConnectedToBLE = HIGH;
    ResetReader();
+   READER_DEBUGPRINT.println(" ");
    READER_DEBUGPRINT.println(F("Connected"));
 }
 
@@ -257,6 +258,7 @@ void onBLEConnected(BLEDevice central)
 void onBLEDisconnected(BLEDevice central)
 {
    LED_SetConnectedToBLE = LOW;
+   READER_DEBUGPRINT.println(" ");
    READER_DEBUGPRINT.println(F("Disconnected"));
 }
 
@@ -525,14 +527,13 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 
 #pragma region READ AND WRITE TO NFC EEPROM - SIMULATE SENSOR
 ///
-///
-/// @brief simulate the actions of a real sensor
+/// @brief simulate the actions of a real sensor. We support both activation and deactivation
 ///
 void SimulateSensor()
 {
    if (!_readerBusy)
    {
-      if (reader_detected & !sensor_starting)
+      if (reader_detected & !sensor_starting & !sensor_shutting_down)
       {
          READER_DEBUGPRINT.println(" ");
          READER_DEBUGPRINT.println("READER DETECTED");
@@ -548,13 +549,16 @@ void SimulateSensor()
 
          // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
          sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
+
+         // is the sensor instead shutting down? we detect this by checking for the char array 'cmd:ship'
+         sensor_shutting_down = CheckNeedle(tagRead, COMMAND_SHIP, ISO15693_USER_MEMORY, 8);
       }
 
       //
       // if the sensor is starting we initiate a countdown of 'n' seconds
       // during which time we DO NOT continue to read the EEPROM contents
       //
-      else if (sensor_starting)
+      else if (sensor_starting & !sensor_shutting_down)
       {
          if (sensor_startup_count++ > 60)
          {
@@ -566,10 +570,34 @@ void SimulateSensor()
 
             sensor_startup_count = 0x00;
             sensor_starting = false;
+            sensor_shutting_down = false;
             reader_detected = false;
             tagDetectedEvent = false;
          }
       }
+
+      //
+      // the same for when the sensor is shutting down, except now we only
+      // apply a nominal shutdown period of 10 seconds
+      //
+      else if (!sensor_starting & sensor_shutting_down)
+      {
+         if (sensor_startup_count++ > 10)
+         {
+            sensor.SetProperty(CMWR_Parameter::cmst, SHIP);
+            publish_tag();
+
+            READER_DEBUGPRINT.println(" ");
+            READER_DEBUGPRINT.println("SENSOR NOW DISABLED");
+
+            sensor_startup_count = 0x00;
+            sensor_starting = false;
+            sensor_shutting_down = false;
+            reader_detected = false;
+            tagDetectedEvent = false;
+         }
+      }
+
       if (tagDetectedEvent)
       {
          reader_detected = true;
