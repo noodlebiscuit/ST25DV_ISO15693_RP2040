@@ -992,51 +992,24 @@ void ProcessReceivedQueries()
       }
       else if ((_cmwr_parameter == CMWR_Parameter::none) & (_cwwr_command != CMWR_Command::none))
       {
-         // Read 16 bytes from EEPROM location 0x0
-         uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
+         std::vector<std::string> records;
 
-         // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
-         tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
-
-         // now we're goinf to read the entire EEPROM contents and parse them into an array of strings
-         int _end_position = 0;
-         size_t posn = 0;
-         size_t length = ISO15693_USER_MEMORY;
-         uint8_t *apples = Substring(tagRead, _end_position, length);
-         bool valid = true;
-
-         while(valid)
-         {  
-            valid = CheckNeedle(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
-            if (!valid)
+         switch (_cwwr_command)
+         {
+         case CMWR_Command::none:
+            READER_DEBUG_PRINT.println("none");
+            break;
+         case CMWR_Command::read:
+            records = ReadContentsOfEEPROM();
+            for (size_t i = 0; i < records.size(); i++)
             {
-               break;
+               READER_DEBUG_PRINT.println(records[i].c_str());
             }
-            
-            posn = GetNeedlePosition(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
-            
-            char *ndef_string = Substring((char *)apples, posn + NDEF_HEADER_BYTES, (apples[posn - 1] - NDEF_FOOTER_BYTES));
-            
-            READER_DEBUG_PRINT.println(ndef_string);
-            PublishResponseToBluetooth(ndef_string, (apples[posn - 1] - NDEF_FOOTER_BYTES));
-
-            _end_position = posn + apples[posn - 1];
-            length = length - (apples[posn - 1] + posn);
-            apples = Substring(apples, _end_position, length);
+            break;
+         case CMWR_Command::reset:
+            READER_DEBUG_PRINT.println("reset");
+            break;
          }
-
-         // switch (_cwwr_command)
-         // {
-         // case CMWR_Command::none:
-         //    READER_DEBUG_PRINT.println("none");
-         //    break;
-         // case CMWR_Command::read:
-         //    READER_DEBUG_PRINT.println("read");
-         //    break;
-         // case CMWR_Command::reset:
-         //    READER_DEBUG_PRINT.println("reset");
-         //    break;
-         // }
       }
 
       delete[] queryBody;
@@ -1045,6 +1018,49 @@ void ProcessReceivedQueries()
       _messageIdentifier = 0x0000;
       _SerialBuffer.clear();
    }
+}
+
+std::vector<std::string> ReadContentsOfEEPROM()
+{
+   std::vector<std::string> ndefRecords;
+   ndefRecords.clear();
+
+   // Read 16 bytes from EEPROM location 0x0
+   uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
+
+   // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
+   tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
+
+   // now we're goinf to read the entire EEPROM contents and parse them into an array of strings
+   int endPosition = 0;
+   size_t startPosition = 0;
+   size_t length = ISO15693_USER_MEMORY;
+   uint8_t *apples = Substring(tagRead, endPosition, length);
+   bool valid = true;
+
+   while (valid)
+   {
+      valid = CheckNeedle(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
+      if (!valid)
+      {
+         break;
+      }
+
+      startPosition = GetNeedlePosition(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
+      char *ndef_string = Substring((char *)apples, startPosition + NDEF_HEADER_BYTES, (apples[startPosition - 1] - NDEF_FOOTER_BYTES));
+
+      ndefRecords.push_back(ndef_string);
+
+      // READER_DEBUG_PRINT.println(ndef_string);
+
+      // PublishResponseToBluetooth(ndef_string, (apples[startPosition - 1] - NDEF_FOOTER_BYTES));
+
+      endPosition = startPosition + apples[startPosition - 1];
+      length = length - (apples[startPosition - 1] + startPosition);
+      apples = Substring(apples, endPosition, length);
+   }
+
+   return ndefRecords;
 }
 
 ///
