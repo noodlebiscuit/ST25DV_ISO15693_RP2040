@@ -250,7 +250,7 @@ const char STST[] = _STST;
 const char STTS[] = _STTS;
 
 ///
-/// @brief array of command strings
+/// @brief array of cmwr specific command strings
 ///
 const std::string cmwr_nfc_parameter[CMWR_PARAMETER_COUNT] = {IMEI,
                                                               MODL,
@@ -264,6 +264,30 @@ const std::string cmwr_nfc_parameter[CMWR_PARAMETER_COUNT] = {IMEI,
                                                               TLIV,
                                                               STST,
                                                               STTS};
+
+//------------------------------------------------------------------------------------------------
+
+const size_t CMWR_COMMAND_COUNT = 2;
+
+#define _READ "read"
+#define _RESET "reset"
+
+const std::string command_prefix = "command";
+
+const char READ[] = _READ;
+const char RESET[] = _RESET;
+
+const std::string cmwr_command[CMWR_COMMAND_COUNT] = {READ,
+                                                      RESET};
+
+
+/// @brief supported commands
+enum class CMWR_Command : uint8_t
+{
+    none = 0x00,
+    read = 0x01,
+    reset = 0x02
+};
 
 //------------------------------------------------------------------------------------------------
 

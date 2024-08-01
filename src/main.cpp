@@ -127,8 +127,11 @@ SFE_ST25DV64KC_NDEF tag;
 /// @brief  references the UID from the TAG to block multiple reads
 uint8_t _headerdata[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-/// @brief what command type was issued by the connected client?
-CMWR_Parameter _cmwr_parameter = none;
+/// @brief what nfc parameter type was issued by the connected client?
+CMWR_Parameter _cmwr_parameter = CMWR_Parameter::none;
+
+/// @brief what external command type was issued by the connected client?
+CMWR_Command _cwwr_command = CMWR_Command::none;
 
 /// @brief represent time in seconds from sensor receiving cmd:cmsd to it starting0071Q0014#tliv:3.47 2312041113ed020960
 volatile uint8_t sensor_startup_count = 0x00;
@@ -931,6 +934,8 @@ void ProcessReceivedQueries()
       }
 
       std::string search(queryBody);
+
+      // first we search through the NFC parameters list. One of these?
       for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
       {
          if (search.find(cmwr_nfc_parameter[i]) == 0)
@@ -940,8 +945,24 @@ void ProcessReceivedQueries()
          }
       }
 
-      // extract the the command payload
-      if (_cmwr_parameter != CMWR_Parameter::none)
+      // ok, maybe it was a command. Let's have a look through them
+      if (search.find(command_prefix) == 0)
+      {
+         size_t colon = search.find(':');
+         char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
+         std::string search_cmd(subs);
+         for (size_t i = 0; i < CMWR_COMMAND_COUNT; i++)
+         {
+            if (search_cmd.find(cmwr_command[i]) == 0)
+            {
+               _cwwr_command = CMWR_Command(i + 1);
+               break;
+            }
+         }
+      }
+
+      // if it's an nfc parameter, then extract the required payload to be written
+      if ((_cmwr_parameter != CMWR_Parameter::none) & (_cwwr_command == CMWR_Command::none))
       {
          size_t colon = search.find(':');
          char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
@@ -998,12 +1019,13 @@ void ProcessReceivedQueries()
 
          free(subs);
       }
-      else
+      else /* if ((_cmwr_parameter == CMWR_Parameter::none) & (_cwwr_command != CMWR_Command::none))*/
       {
+         // size_t colon = search.find(':');
+         // char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
+         READER_DEBUG_PRINT.println(search.c_str());
          READER_DEBUG_PRINT.println(queryBody);
-
-
-
+         READER_DEBUG_PRINT.println((byte)_cwwr_command);
       }
 
       delete[] queryBody;

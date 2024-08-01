@@ -9,7 +9,7 @@
 ///
 /// @brief  Describes each of the commands that this reader supports
 ///
-enum CMWR_Parameter : uint8_t
+enum class CMWR_Parameter : uint8_t
 {
     none = 0x00,
     imei = 0x01,
