@@ -1004,6 +1004,7 @@ void ProcessReceivedQueries()
             for (size_t i = 0; i < records.size(); i++)
             {
                READER_DEBUG_PRINT.println(records[i].c_str());
+               PublishResponseToBluetooth(records[i].c_str(), records[i].length());
             }
             break;
          case CMWR_Command::reset:
@@ -1020,6 +1021,10 @@ void ProcessReceivedQueries()
    }
 }
 
+///
+/// @brief reads all NDEF records from the EEPROM and returns them as a list of strings
+/// @return formatted list of strings
+///
 std::vector<std::string> ReadContentsOfEEPROM()
 {
    std::vector<std::string> ndefRecords;
@@ -1048,13 +1053,7 @@ std::vector<std::string> ReadContentsOfEEPROM()
 
       startPosition = GetNeedlePosition(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
       char *ndef_string = Substring((char *)apples, startPosition + NDEF_HEADER_BYTES, (apples[startPosition - 1] - NDEF_FOOTER_BYTES));
-
       ndefRecords.push_back(ndef_string);
-
-      // READER_DEBUG_PRINT.println(ndef_string);
-
-      // PublishResponseToBluetooth(ndef_string, (apples[startPosition - 1] - NDEF_FOOTER_BYTES));
-
       endPosition = startPosition + apples[startPosition - 1];
       length = length - (apples[startPosition - 1] + startPosition);
       apples = Substring(apples, endPosition, length);
@@ -1068,7 +1067,7 @@ std::vector<std::string> ReadContentsOfEEPROM()
 /// @param message_length raw NDEF message payload
 /// @param headerdata NDEF meassage header with UUID
 ///
-void PublishResponseToBluetooth(char *pagedata, size_t message_length)
+void PublishResponseToBluetooth(const char *pagedata, size_t message_length)
 {
    // make sure we don't have any NFC scanning overlaps here
    _readerBusy = true;

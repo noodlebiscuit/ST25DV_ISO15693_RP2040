@@ -320,7 +320,7 @@ void onRxCharValueUpdate(BLEDevice, BLECharacteristic);
 void ProcessReceivedQueries();
 void publish_tag();
 void PublishHardwareDetails();
-void PublishResponseToBluetooth(char *, size_t);
+void PublishResponseToBluetooth(const char *, size_t);
 void ResetReader();
 void SetTagIdentifier(uint8_t *);
 void SetupBLE();
