@@ -1004,14 +1004,13 @@ void ProcessReceivedQueries()
          size_t length = ISO15693_USER_MEMORY;
          uint8_t *apples = Substring(tagRead, _end_position, length);
 
-         for (int i = 0; i < 10; i++)
+         for (int i = 0; i < (int)CMWR_PARAMETER_COUNT; i++)
          {
             posn = GetNeedlePosition(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
             char *ndef_string = Substring((char *)apples, posn + NDEF_HEADER_BYTES, (apples[posn - 1] - NDEF_FOOTER_BYTES));
             
             READER_DEBUG_PRINT.println(ndef_string);
             PublishResponseToBluetooth(ndef_string, (apples[posn - 1] - NDEF_FOOTER_BYTES));
-
 
             _end_position = posn + apples[posn - 1];
             length = length - (apples[posn - 1] + posn);
