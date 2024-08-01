@@ -436,7 +436,7 @@ void loop() {}
 
 #pragma region STRING MANAGEMENT AND SUPPORT
 ///
-/// @brief
+/// @brief does a particular array of bytes exist within a buffer?
 /// @param buffer source byte array to seach against
 /// @param cmd reference byte array to search for within the buffer
 /// @param buffer_length length of the buffer array
@@ -448,6 +448,20 @@ bool CheckNeedle(uint8_t *buffer, uint8_t *cmd, size_t buffer_length, size_t cmd
    std::string haystack(buffer, buffer + buffer_length); // or "+ sizeof Buffer"
    std::size_t n = haystack.find(needle);
    return (n != std::string::npos);
+}
+
+///
+/// @brief what is the start position of a particular string within a buffer?
+/// @param buffer source byte array to seach against
+/// @param cmd reference byte array to search for within the buffer
+/// @param buffer_length length of the buffer array
+/// @param cmd_length length of the reference array
+///
+size_t GetNeedlePosition(uint8_t *buffer, uint8_t *cmd, size_t buffer_length, size_t cmd_length)
+{
+   std::string needle(cmd, cmd + cmd_length);
+   std::string haystack(buffer, buffer + buffer_length); // or "+ sizeof Buffer"
+   return haystack.find(needle);
 }
 
 ///
@@ -495,6 +509,22 @@ char *Substring(char *string, int position, int length)
       *(pointer + c) = *((string + position - 1) + c);
 
    *(pointer + c) = '\0';
+
+   return pointer;
+}
+
+uint8_t *Substring(uint8_t *sourceArray, int position, int length)
+{
+   uint8_t *pointer;
+   int c;
+
+   pointer = (uint8_t *)malloc(length + 1);
+
+   if (pointer == NULL)
+      exit(EXIT_FAILURE);
+
+   for (c = 0; c < length; c++)
+      *(pointer + c) = *((sourceArray + position - 1) + c);
 
    return pointer;
 }
@@ -646,31 +676,6 @@ void publish_tag()
 #pragma endregion
 
 //-------------------------------------------------------------------------------------------------
-
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
-// ************************************************************************************************
 
 #pragma region BLUETOOTH MESSAGE PROCESSING
 ///
@@ -945,6 +950,7 @@ void ProcessReceivedQueries()
          if (search.find(cmwr_nfc_parameter[i], 0) != std::string::npos)
          {
             _cmwr_parameter = CMWR_Parameter(i + 1);
+
             break;
          }
       }
@@ -953,8 +959,8 @@ void ProcessReceivedQueries()
       if (search.find(command_prefix) != std::string::npos)
       {
          size_t colon = search.find(':');
-         char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
-         std::string search_cmd(subs);
+         char *substr = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
+         std::string search_cmd(substr);
          for (size_t i = 0; i < CMWR_COMMAND_COUNT; i++)
          {
             if (search_cmd.find(cmwr_command[i]) != std::string::npos)
@@ -963,77 +969,79 @@ void ProcessReceivedQueries()
                break;
             }
          }
+         free(substr);
       }
 
       // if it's an nfc parameter, then extract the required payload to be written
-      if (_cmwr_parameter != CMWR_Parameter::none)
+      if ((_cmwr_parameter != CMWR_Parameter::none) & (_cwwr_command == CMWR_Command::none))
       {
          size_t colon = search.find(':');
-         char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
+         char *nfc_param = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
 
          // let the calling service know that we processed the nfc property without issues
          PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
 
          // update the sensor property and public the new object to the EEPROM
-         sensor.SetProperty(_cmwr_parameter, subs);
+         sensor.SetProperty(_cmwr_parameter, nfc_param);
          publish_tag();
 
-         // DEBUG show the property type
-         switch (_cmwr_parameter)
-         {
-         case CMWR_Parameter::angl:
-            READER_DEBUG_PRINT.print("ANGL:");
-            break;
-         case CMWR_Parameter::apvn:
-            READER_DEBUG_PRINT.print("APVN:");
-            break;
-         case CMWR_Parameter::btvn:
-            READER_DEBUG_PRINT.print("BTVN:");
-            break;
-         case CMWR_Parameter::cmst:
-            READER_DEBUG_PRINT.print("CMST:");
-            break;
-         case CMWR_Parameter::hwvn:
-            READER_DEBUG_PRINT.print("HWVN:");
-            break;
-         case CMWR_Parameter::imei:
-            READER_DEBUG_PRINT.print("IMEI:");
-            break;
-         case CMWR_Parameter::mfdt:
-            READER_DEBUG_PRINT.print("MFDT:");
-            break;
-         case CMWR_Parameter::modl:
-            READER_DEBUG_PRINT.print("MODL:");
-            break;
-         case CMWR_Parameter::pmvn:
-            READER_DEBUG_PRINT.print("PMVN:");
-            break;
-         case CMWR_Parameter::stst:
-            READER_DEBUG_PRINT.print("STST:");
-            break;
-         case CMWR_Parameter::stts:
-            READER_DEBUG_PRINT.print("STTS:");
-            break;
-         case CMWR_Parameter::tliv:
-            READER_DEBUG_PRINT.print("TLIV:");
-            break;
-         }
-         // publish the property payload
-         READER_DEBUG_PRINT.println(subs);
+         // debug print the extracted property payload
+         READER_DEBUG_PRINT.println(nfc_param);
 
-         free(subs);
+         free(nfc_param);
       }
       else if ((_cmwr_parameter == CMWR_Parameter::none) & (_cwwr_command != CMWR_Command::none))
       {
-         switch (_cwwr_command)
-         {
-         case CMWR_Command::read:
-            READER_DEBUG_PRINT.println("READ COMMAND");
-            break;
-         case CMWR_Command::reset:
-            READER_DEBUG_PRINT.println("RESET COMMAND");
-            break;
-         }
+         // Read 16 bytes from EEPROM location 0x0
+         uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
+
+         // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
+         tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
+
+         // get the positions of each
+         size_t posn = GetNeedlePosition(tagRead, NDEF_START, ISO15693_USER_MEMORY, 4);
+
+         READER_DEBUG_PRINT.println(posn);
+         READER_DEBUG_PRINT.println(tagRead[posn - 1]);
+
+         int _end_position = posn + tagRead[posn - 1];
+
+         uint8_t *apples = Substring(tagRead, _end_position, ISO15693_USER_MEMORY - _end_position);
+
+         // get the positions of each
+         size_t posnx = GetNeedlePosition(apples, NDEF_START, ISO15693_USER_MEMORY - _end_position, 4);
+
+         READER_DEBUG_PRINT.println(posnx);
+         READER_DEBUG_PRINT.println(apples[posnx - 1]);
+
+
+
+
+
+         // assume p has some data
+         // std::string s(reinterpret_cast<const char *>(tagRead), 30); // Assign the first 30 characters of p to s.
+
+         // Alternate method
+         // std::string s2;
+         // s2.append(reinterpret_cast<const char *>(p), 30); // append 30 characters to s2
+
+         // READER_DEBUG_PRINT.println(s.c_str());
+
+         // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
+         // sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
+
+         // switch (_cwwr_command)
+         // {
+         // case CMWR_Command::none:
+         //    READER_DEBUG_PRINT.println("none");
+         //    break;
+         // case CMWR_Command::read:
+         //    READER_DEBUG_PRINT.println("read");
+         //    break;
+         // case CMWR_Command::reset:
+         //    READER_DEBUG_PRINT.println("reset");
+         //    break;
+         // }
       }
 
       delete[] queryBody;

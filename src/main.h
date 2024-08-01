@@ -168,6 +168,9 @@ byte COMMAND_CMSD[] = {0x63, 0x6d, 0x64, 0x3a, 0x63, 0x6d, 0x73, 0x64};
 /// @brief ship command written to sensor
 byte COMMAND_SHIP[] = {0x63, 0x6d, 0x64, 0x3a, 0x73, 0x68, 0x69, 0x70};
 
+/// @brief start of an NDEF record
+byte NDEF_START[] = {0x54, 0x02, 0x65, 0x6e};
+
 /// @brief detail which pins are allocated to I2C
 TwoWire MyWire(digitalPinToPinName(SDA_PIN), digitalPinToPinName(SCL_PIN));
 
@@ -295,6 +298,7 @@ enum class CMWR_Command : uint8_t
 bool CheckNeedle(uint8_t *, uint8_t *, size_t, size_t);
 bool CompareTagIdentifier(uint8_t *);
 char *Substring(char *, int, int);
+uint8_t *Substring(uint8_t *, int, int);
 const char *HexStr(const uint8_t *, int, bool);
 size_t WriteToSPP(uint8_t);
 static void onBLEWritten(BLEDevice, BLECharacteristic);
@@ -303,6 +307,7 @@ void AddDataServiceBLE();
 void AddDeviceServiceBLE();
 void AtTime();
 void bluetooth_thread();
+size_t GetNeedlePosition(uint8_t *, uint8_t *, size_t, size_t);
 void InsertSubstring(char *, const char *, int);
 void main_thread();
 void onBLEConnected(BLEDevice);
