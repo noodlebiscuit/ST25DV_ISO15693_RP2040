@@ -998,6 +998,7 @@ void ProcessReceivedQueries()
          // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
          tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
 
+         // now we're goinf to read the entire EEPROM contents and parse them into an array of strings
          int _end_position = 0;
          size_t posn = 0;
          size_t length = ISO15693_USER_MEMORY;
@@ -1005,42 +1006,17 @@ void ProcessReceivedQueries()
 
          for (int i = 0; i < 10; i++)
          {
-            posn = GetNeedlePosition(apples, NDEF_START, length, 4);
+            posn = GetNeedlePosition(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
+            char *ndef_string = Substring((char *)apples, posn + NDEF_HEADER_BYTES, (apples[posn - 1] - NDEF_FOOTER_BYTES));
+            
+            READER_DEBUG_PRINT.println(ndef_string);
+            PublishResponseToBluetooth(ndef_string, (apples[posn - 1] - NDEF_FOOTER_BYTES));
 
-
-            // READER_DEBUG_PRINT.print("START POSITION: ");
-            // READER_DEBUG_PRINT.println(posn);
-
-            // READER_DEBUG_PRINT.print("LENGTH: ");
-            // READER_DEBUG_PRINT.println(apples[posn - 1]);
-
-            char* spuds = Substring((char*)apples, posn+5, (apples[posn - 1] - 3));
-            READER_DEBUG_PRINT.println(spuds);
 
             _end_position = posn + apples[posn - 1];
-
             length = length - (apples[posn - 1] + posn);
-
             apples = Substring(apples, _end_position, length);
-
-            
-
          }
-
-         // READER_DEBUG_PRINT.println(posn);
-         // READER_DEBUG_PRINT.println(apples[posn - 1]);
-
-         // assume p has some data
-         // std::string s(reinterpret_cast<const char *>(tagRead), 30); // Assign the first 30 characters of p to s.
-
-         // Alternate method
-         // std::string s2;
-         // s2.append(reinterpret_cast<const char *>(p), 30); // append 30 characters to s2
-
-         // READER_DEBUG_PRINT.println(s.c_str());
-
-         // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
-         // sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
 
          // switch (_cwwr_command)
          // {

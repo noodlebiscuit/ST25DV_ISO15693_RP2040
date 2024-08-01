@@ -145,6 +145,9 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define BLOCK_WAIT_BLE 50000     // wait 50ms between each BLE transmit packet
 #define SENSOR_STARTUP_TIME 120  // time in seconds for the CMWR32 sensor to start
 #define SENSOR_SHUTDOWN_TIME 30  // time in seconds for the CMWR32 sensor to shutdown
+#define NDEF_HEADER_BYTES 5
+#define NDEF_SEARCH_BYTES 4
+#define NDEF_FOOTER_BYTES 3
 
 //------------------------------------------------------------------------------------------------
 
