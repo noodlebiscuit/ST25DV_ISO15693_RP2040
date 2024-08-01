@@ -128,7 +128,7 @@ SFE_ST25DV64KC_NDEF tag;
 uint8_t _headerdata[7] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 /// @brief what command type was issued by the connected client?
-CMWR_Parameter _scomp_command = none;
+CMWR_Parameter _cmwr_parameter = none;
 
 /// @brief represent time in seconds from sensor receiving cmd:cmsd to it starting0071Q0014#tliv:3.47 2312041113ed020960
 volatile uint8_t sensor_startup_count = 0x00;
@@ -933,15 +933,15 @@ void ProcessReceivedQueries()
       std::string search(queryBody);
       for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
       {
-         if (search.find(scompCommands[i]) == 0)
+         if (search.find(cmwrParameter[i]) == 0)
          {
-            _scomp_command = CMWR_Parameter(i + 1);
+            _cmwr_parameter = CMWR_Parameter(i + 1);
             break;
          }
       }
 
       // extract the the command payload
-      if (_scomp_command != CMWR_Parameter::none)
+      if (_cmwr_parameter != CMWR_Parameter::none)
       {
          size_t colon = search.find(':');
          char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
@@ -950,11 +950,11 @@ void ProcessReceivedQueries()
          PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
 
          // update the sensor property and public the new object to the EEPROM
-         sensor.SetProperty(_scomp_command, subs);
+         sensor.SetProperty(_cmwr_parameter, subs);
          publish_tag();
 
          // DEBUG show the property type
-         switch (_scomp_command)
+         switch (_cmwr_parameter)
          {
          case CMWR_Parameter::angl:
             READER_DEBUG_PRINT.print("ANGL:");
@@ -997,6 +997,13 @@ void ProcessReceivedQueries()
          READER_DEBUG_PRINT.println(subs);
 
          free(subs);
+      }
+      else
+      {
+         READER_DEBUG_PRINT.println(queryBody);
+
+
+
       }
 
       delete[] queryBody;

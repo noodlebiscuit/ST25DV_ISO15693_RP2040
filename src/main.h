@@ -252,7 +252,7 @@ const char STTS[] = _STTS;
 ///
 /// @brief array of command strings
 ///
-const std::string scompCommands[CMWR_PARAMETER_COUNT] = {IMEI,
+const std::string cmwrParameter[CMWR_PARAMETER_COUNT] = {IMEI,
                                                          MODL,
                                                          MFDT,
                                                          HWVN,
