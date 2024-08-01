@@ -234,7 +234,7 @@ CMWR23 sensor;
 
 //------------------------------------------------------------------------------------------------
 
-const size_t CMWR_COMMAND_COUNT = 12;
+const size_t CMWR_PARAMETER_COUNT = 12;
 
 const char IMEI[] = _IMEI;
 const char MODL[] = _MODL;
@@ -252,18 +252,18 @@ const char STTS[] = _STTS;
 ///
 /// @brief array of command strings
 ///
-const std::string cmwr_command[CMWR_COMMAND_COUNT] = {IMEI,
-                                                        MODL,
-                                                        MFDT,
-                                                        HWVN,
-                                                        BTVN,
-                                                        APVN,
-                                                        PMVN,
-                                                        ANGL,
-                                                        CMST,
-                                                        TLIV,
-                                                        STST,
-                                                        STTS};
+const std::string cmwr_nfc_parameter[CMWR_PARAMETER_COUNT] = {IMEI,
+                                                              MODL,
+                                                              MFDT,
+                                                              HWVN,
+                                                              BTVN,
+                                                              APVN,
+                                                              PMVN,
+                                                              ANGL,
+                                                              CMST,
+                                                              TLIV,
+                                                              STST,
+                                                              STTS};
 
 //------------------------------------------------------------------------------------------------
 

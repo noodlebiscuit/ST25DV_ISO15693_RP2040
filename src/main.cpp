@@ -931,9 +931,9 @@ void ProcessReceivedQueries()
       }
 
       std::string search(queryBody);
-      for (size_t i = 0; i < CMWR_COMMAND_COUNT; i++)
+      for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
       {
-         if (search.find(cmwr_command[i]) == 0)
+         if (search.find(cmwr_nfc_parameter[i]) == 0)
          {
             _cmwr_parameter = CMWR_Parameter(i + 1);
             break;
