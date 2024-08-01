@@ -1003,10 +1003,18 @@ void ProcessReceivedQueries()
          size_t posn = 0;
          size_t length = ISO15693_USER_MEMORY;
          uint8_t *apples = Substring(tagRead, _end_position, length);
+         bool valid = true;
 
-         for (int i = 0; i < (int)CMWR_PARAMETER_COUNT; i++)
-         {
+         while(valid)
+         {  
+            valid = CheckNeedle(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
+            if (!valid)
+            {
+               break;
+            }
+            
             posn = GetNeedlePosition(apples, NDEF_START, length, NDEF_SEARCH_BYTES);
+            
             char *ndef_string = Substring((char *)apples, posn + NDEF_HEADER_BYTES, (apples[posn - 1] - NDEF_FOOTER_BYTES));
             
             READER_DEBUG_PRINT.println(ndef_string);
