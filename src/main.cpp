@@ -998,25 +998,37 @@ void ProcessReceivedQueries()
          // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
          tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
 
-         // get the positions of each
-         size_t posn = GetNeedlePosition(tagRead, NDEF_START, ISO15693_USER_MEMORY, 4);
+         int _end_position = 0;
+         size_t posn = 0;
+         size_t length = ISO15693_USER_MEMORY;
+         uint8_t *apples = Substring(tagRead, _end_position, length);
 
-         READER_DEBUG_PRINT.println(posn);
-         READER_DEBUG_PRINT.println(tagRead[posn - 1]);
-
-         int _end_position = posn + tagRead[posn - 1];
-
-         uint8_t *apples = Substring(tagRead, _end_position, ISO15693_USER_MEMORY - _end_position);
-
-         // get the positions of each
-         size_t posnx = GetNeedlePosition(apples, NDEF_START, ISO15693_USER_MEMORY - _end_position, 4);
-
-         READER_DEBUG_PRINT.println(posnx);
-         READER_DEBUG_PRINT.println(apples[posnx - 1]);
+         for (int i = 0; i < 10; i++)
+         {
+            posn = GetNeedlePosition(apples, NDEF_START, length, 4);
 
 
+            // READER_DEBUG_PRINT.print("START POSITION: ");
+            // READER_DEBUG_PRINT.println(posn);
 
+            // READER_DEBUG_PRINT.print("LENGTH: ");
+            // READER_DEBUG_PRINT.println(apples[posn - 1]);
 
+            char* spuds = Substring((char*)apples, posn+5, (apples[posn - 1] - 3));
+            READER_DEBUG_PRINT.println(spuds);
+
+            _end_position = posn + apples[posn - 1];
+
+            length = length - (apples[posn - 1] + posn);
+
+            apples = Substring(apples, _end_position, length);
+
+            
+
+         }
+
+         // READER_DEBUG_PRINT.println(posn);
+         // READER_DEBUG_PRINT.println(apples[posn - 1]);
 
          // assume p has some data
          // std::string s(reinterpret_cast<const char *>(tagRead), 30); // Assign the first 30 characters of p to s.
