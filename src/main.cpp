@@ -912,6 +912,10 @@ void onBLEWritten(BLEDevice central, BLECharacteristic characteristic)
 ///
 void ProcessReceivedQueries()
 {
+   // reset the command and parameter type flags
+   _cmwr_parameter = CMWR_Parameter::none;
+   _cwwr_command = CMWR_Command::none;
+
    // if an invalid QUERY was received, then we need to let the client know
    if (_invalidQueryReceived & (_messageIdentifier == 0x000))
    {
@@ -938,7 +942,7 @@ void ProcessReceivedQueries()
       // first we search through the NFC parameters list. One of these?
       for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
       {
-         if (search.find(cmwr_nfc_parameter[i]) == 0)
+         if (search.find(cmwr_nfc_parameter[i], 0) != std::string::npos)
          {
             _cmwr_parameter = CMWR_Parameter(i + 1);
             break;
@@ -946,14 +950,14 @@ void ProcessReceivedQueries()
       }
 
       // ok, maybe it was a command. Let's have a look through them
-      if (search.find(command_prefix) == 0)
+      if (search.find(command_prefix) != std::string::npos)
       {
          size_t colon = search.find(':');
          char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
          std::string search_cmd(subs);
          for (size_t i = 0; i < CMWR_COMMAND_COUNT; i++)
          {
-            if (search_cmd.find(cmwr_command[i]) == 0)
+            if (search_cmd.find(cmwr_command[i]) != std::string::npos)
             {
                _cwwr_command = CMWR_Command(i + 1);
                break;
@@ -962,7 +966,7 @@ void ProcessReceivedQueries()
       }
 
       // if it's an nfc parameter, then extract the required payload to be written
-      if ((_cmwr_parameter != CMWR_Parameter::none) & (_cwwr_command == CMWR_Command::none))
+      if (_cmwr_parameter != CMWR_Parameter::none)
       {
          size_t colon = search.find(':');
          char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
@@ -1019,13 +1023,17 @@ void ProcessReceivedQueries()
 
          free(subs);
       }
-      else /* if ((_cmwr_parameter == CMWR_Parameter::none) & (_cwwr_command != CMWR_Command::none))*/
+      else if ((_cmwr_parameter == CMWR_Parameter::none) & (_cwwr_command != CMWR_Command::none))
       {
-         // size_t colon = search.find(':');
-         // char *subs = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
-         READER_DEBUG_PRINT.println(search.c_str());
-         READER_DEBUG_PRINT.println(queryBody);
-         READER_DEBUG_PRINT.println((byte)_cwwr_command);
+         switch (_cwwr_command)
+         {
+         case CMWR_Command::read:
+            READER_DEBUG_PRINT.println("READ COMMAND");
+            break;
+         case CMWR_Command::reset:
+            READER_DEBUG_PRINT.println("RESET COMMAND");
+            break;
+         }
       }
 
       delete[] queryBody;
