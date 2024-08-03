@@ -3,6 +3,15 @@
 /// @brief default constructor
 CMWR23::CMWR23()
 {
+    ResetProperties();
+};
+
+/// @brief default destructor
+CMWR23::~CMWR23() {};
+
+/// @brief resets all internal properties to their default stata
+void CMWR23::ResetProperties()
+{
     _sensorProperties.clear();
     _sensorProperties.push_back(_IMEI_DEFAULT);
     _sensorProperties.push_back(_MODL_DEFAULT);
@@ -16,10 +25,7 @@ CMWR23::CMWR23()
     _sensorProperties.push_back(_TLIV_DEFAULT);
     _sensorProperties.push_back(_STST_DEFAULT);
     _sensorProperties.push_back(_STTS_DEFAULT);
-};
-
-/// @brief default destructor
-CMWR23::~CMWR23() {};
+}
 
 /// @brief set the content for a specific property
 /// @param parameter property before

@@ -65,7 +65,8 @@ public:
     /// @brief default destructor
     ~CMWR23();
 
-    void SetProperty(CMWR_Parameter, const char*);
+    void ResetProperties();
+    void SetProperty(CMWR_Parameter, const char *);
     std::string GetSensorProperty(CMWR_Parameter);
 };
 

@@ -1008,7 +1008,10 @@ void ProcessReceivedQueries()
             }
             break;
          case CMWR_Command::reset:
+            sensor.ResetProperties();
+            publish_tag();
             READER_DEBUG_PRINT.println("reset");
+            PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
             break;
          }
       }
