@@ -950,7 +950,6 @@ void ProcessReceivedQueries()
          if (search.find(cmwr_nfc_parameter[i], 0) != std::string::npos)
          {
             _cmwr_parameter = CMWR_Parameter(i + 1);
-
             break;
          }
       }
@@ -1014,6 +1013,11 @@ void ProcessReceivedQueries()
             PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
             break;
          }
+      }
+      else if ((_cmwr_parameter == CMWR_Parameter::none) & (_cwwr_command == CMWR_Command::none))
+      {
+         READER_DEBUG_PRINT.println("error");
+         PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
       }
 
       delete[] queryBody;
