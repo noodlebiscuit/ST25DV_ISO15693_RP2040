@@ -600,7 +600,7 @@ void SimulateSensor()
       //
       else if (sensor_starting & !sensor_shutting_down)
       {
-         if (sensor_startup_count++ > SENSOR_STARTUP_TIME)
+         if (sensor_startup_count++ > _sensor_startup_time)
          {
             sensor.SetProperty(CMWR_Parameter::cmst, CMSD);
             publish_tag();
@@ -628,7 +628,7 @@ void SimulateSensor()
       //
       else if (!sensor_starting & sensor_shutting_down)
       {
-         if (sensor_startup_count++ > SENSOR_SHUTDOWN_TIME)
+         if (sensor_startup_count++ > _sensor_shutdown_time)
          {
             sensor.SetProperty(CMWR_Parameter::cmst, SHIP);
             publish_tag();
@@ -941,7 +941,7 @@ void ProcessReceivedQueries()
    // otherwise, return feedback and process the query
    else if (_queryReceived & (_messageIdentifier > 0x000))
    {
-      int period_seconds = SENSOR_SHUTDOWN_TIME;
+      int period_seconds = _sensor_shutdown_time;
       bool range_error = false;
 
       // load the query string into its own string for post-processing
@@ -987,7 +987,7 @@ void ProcessReceivedQueries()
             size_t length = _SerialBuffer.getLength() - (equalsPosn + 1);
             char *time_in_seconds = Substring(queryBody, equalsPosn + 2, length);
 
-            if (std::stoi(time_in_seconds) < 1800)
+            if (std::stoi(time_in_seconds) < SENSOR_IDLE_MAXIMUM)
             {
                //
                // first we clear all existing values from the numeric response payload

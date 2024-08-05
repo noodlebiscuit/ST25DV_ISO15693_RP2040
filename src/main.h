@@ -143,9 +143,10 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define RECEIVE_BUFFER_LENGTH 48 // maximum number of command bytes we can accept
 #define BLOCK_SIZE_BLE 16        // block size in bytes
 #define BLOCK_WAIT_BLE 50000     // wait 50ms between each BLE transmit packet
-#define SENSOR_STARTUP_TIME 120  // time in seconds for the CMWR32 sensor to start
-#define SENSOR_SHUTDOWN_TIME 30  // time in seconds for the CMWR32 sensor to shutdown
-#define NDEF_HEADER_BYTES 5
+#define SENSOR_STARTUP_TIME 120  // time in seconds for the CMWRxx sensor to start
+#define SENSOR_SHUTDOWN_TIME 30  // time in seconds for the CMWRxx sensor to shutdown
+#define SENSOR_IDLE_MAXIMUM 1800 // max time CMWRxx sensor can be starting up or shutting down
+#define NDEF_HEADER_BYTES 5      // number of header bytes in a specific NDEF record
 #define NDEF_SEARCH_BYTES 4
 #define NDEF_FOOTER_BYTES 3
 
@@ -159,10 +160,10 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 
 #pragma region PRIVATE MEMBERS
 /// @brief time between sensor receiving a cmd:cmsd command and sensor then being enabled
-uint16_t _sensor_startup_time =  SENSOR_STARTUP_TIME;
+uint16_t _sensor_startup_time = SENSOR_STARTUP_TIME;
 
 /// @brief time between sensor receiving a cmd:ship command and sensor then being disabled
-uint16_t _sensor_shutdown_time =  SENSOR_SHUTDOWN_TIME;
+uint16_t _sensor_shutdown_time = SENSOR_SHUTDOWN_TIME;
 
 /// @brief  > RECORD HEADER
 /// @brief    These ten bytes describe both the data type as well as the total number of bytes
@@ -225,7 +226,7 @@ char scomp_response_sensor_enabled[] = "sensor enabled";
 /// @brief scomp default response to a sensor being disabled
 char scomp_response_sensor_disabled[] = "sensor disabled";
 
-/// @brief scomp default response to a numeric value request 
+/// @brief scomp default response to a numeric value request
 char scomp_response_return_numeric[] = "ok      ";
 
 /// @brief sensor is commissioned
@@ -306,7 +307,6 @@ const std::string cmwr_command[CMWR_COMMAND_COUNT] = {READ,
                                                       SET_SHUTDOWN,
                                                       GET_START_UP,
                                                       GET_SHUTDOWN};
-
 
 /// @brief supported commands
 enum class CMWR_Command : uint8_t
