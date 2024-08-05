@@ -273,18 +273,30 @@ const std::string cmwr_nfc_parameter[CMWR_PARAMETER_COUNT] = {IMEI,
 
 //------------------------------------------------------------------------------------------------
 
-const size_t CMWR_COMMAND_COUNT = 2;
+const size_t CMWR_COMMAND_COUNT = 6;
 
 #define _READ "read"
 #define _RESET "reset"
+#define _START_UP "cmsd=180"
+#define _SHUTDOWN "ship=060"
+#define _GET_START_UP "getcmsd"
+#define _GET_SHUTDOWN "getship"
 
 const std::string command_prefix = "command";
 
 const char READ[] = _READ;
 const char RESET[] = _RESET;
+const char START_UP[] = _START_UP;
+const char SHUTDOWN[] = _SHUTDOWN;
+const char GET_START_UP[] = _GET_START_UP;
+const char GET_SHUTDOWN[] = _GET_SHUTDOWN;
 
 const std::string cmwr_command[CMWR_COMMAND_COUNT] = {READ,
-                                                      RESET};
+                                                      RESET,
+                                                      START_UP,
+                                                      SHUTDOWN,
+                                                      GET_START_UP,
+                                                      GET_SHUTDOWN};
 
 
 /// @brief supported commands
@@ -292,7 +304,11 @@ enum class CMWR_Command : uint8_t
 {
     none = 0x00,
     read = 0x01,
-    reset = 0x02
+    reset = 0x02,
+    startup = 0x03,
+    shutdown = 0x04,
+    get_startup = 0x05,
+    get_shutdown = 0x06
 };
 
 //------------------------------------------------------------------------------------------------

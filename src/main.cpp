@@ -943,6 +943,7 @@ void ProcessReceivedQueries()
       }
 
       std::string search(queryBody);
+      int period_seconds;
 
       // first we search through the NFC parameters list. One of these?
       for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
@@ -957,6 +958,7 @@ void ProcessReceivedQueries()
       // ok, maybe it was a command. Let's have a look through them
       if (search.find(command_prefix) != std::string::npos)
       {
+         // split the opcode from the operand
          size_t colon = search.find(':');
          char *substr = Substring(queryBody, colon + 2, _SerialBuffer.getLength() - (colon + 1));
          std::string search_cmd(substr);
@@ -968,6 +970,16 @@ void ProcessReceivedQueries()
                break;
             }
          }
+
+         // look for operand data
+         size_t equalsPosn = search.find('=');
+         if (equalsPosn != std::string::npos)
+         {
+            char *time_in_seconds = Substring(queryBody, equalsPosn + 2, _SerialBuffer.getLength() - (equalsPosn + 1));
+            period_seconds = std::stoi(time_in_seconds);
+            free(time_in_seconds);
+         }
+
          free(substr);
       }
 
@@ -1010,6 +1022,18 @@ void ProcessReceivedQueries()
             sensor.ResetProperties();
             publish_tag();
             READER_DEBUG_PRINT.println("reset");
+            PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+            break;
+
+         case CMWR_Command::startup:
+
+            READER_DEBUG_PRINT.println(period_seconds);
+            PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+            break;
+
+         case CMWR_Command::shutdown:
+
+            READER_DEBUG_PRINT.println(period_seconds);
             PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
             break;
          }
