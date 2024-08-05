@@ -158,6 +158,12 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 //------------------------------------------------------------------------------------------------
 
 #pragma region PRIVATE MEMBERS
+/// @brief time between sensor receiving a cmd:cmsd command and sensor then being enabled
+uint16_t _sensor_startup_time =  SENSOR_STARTUP_TIME;
+
+/// @brief time between sensor receiving a cmd:ship command and sensor then being disabled
+uint16_t _sensor_shutdown_time =  SENSOR_SHUTDOWN_TIME;
+
 /// @brief  > RECORD HEADER
 /// @brief    These ten bytes describe both the data type as well as the total number of bytes
 uint8_t PAYLOAD_LEGTH[LENGTH_BYTES] = {0x00, 0x00};
@@ -219,6 +225,9 @@ char scomp_response_sensor_enabled[] = "sensor enabled";
 /// @brief scomp default response to a sensor being disabled
 char scomp_response_sensor_disabled[] = "sensor disabled";
 
+/// @brief scomp default response to a numeric value request 
+char scomp_response_return_numeric[] = "ok      ";
+
 /// @brief sensor is commissioned
 const char *CMSD = "cmsd";
 
@@ -277,8 +286,8 @@ const size_t CMWR_COMMAND_COUNT = 6;
 
 #define _READ "read"
 #define _RESET "reset"
-#define _START_UP "cmsd=180"
-#define _SHUTDOWN "ship=060"
+#define _SET_START_UP "cmsd="
+#define _SET_SHUTDOWN "ship="
 #define _GET_START_UP "getcmsd"
 #define _GET_SHUTDOWN "getship"
 
@@ -286,15 +295,15 @@ const std::string command_prefix = "command";
 
 const char READ[] = _READ;
 const char RESET[] = _RESET;
-const char START_UP[] = _START_UP;
-const char SHUTDOWN[] = _SHUTDOWN;
+const char SET_START_UP[] = _SET_START_UP;
+const char SET_SHUTDOWN[] = _SET_SHUTDOWN;
 const char GET_START_UP[] = _GET_START_UP;
 const char GET_SHUTDOWN[] = _GET_SHUTDOWN;
 
 const std::string cmwr_command[CMWR_COMMAND_COUNT] = {READ,
                                                       RESET,
-                                                      START_UP,
-                                                      SHUTDOWN,
+                                                      SET_START_UP,
+                                                      SET_SHUTDOWN,
                                                       GET_START_UP,
                                                       GET_SHUTDOWN};
 
@@ -305,8 +314,8 @@ enum class CMWR_Command : uint8_t
     none = 0x00,
     read = 0x01,
     reset = 0x02,
-    startup = 0x03,
-    shutdown = 0x04,
+    set_startup = 0x03,
+    set_shutdown = 0x04,
     get_startup = 0x05,
     get_shutdown = 0x06
 };

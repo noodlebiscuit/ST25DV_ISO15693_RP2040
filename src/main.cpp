@@ -489,7 +489,7 @@ void InsertSubstring(char *a, const char *b, int position)
 }
 
 ///
-/// @brief
+/// @brief extract a substring from a reference string
 /// @param string raw string
 /// @param position starting character index
 /// @param length number of characters to extract
@@ -513,6 +513,13 @@ char *Substring(char *string, int position, int length)
    return pointer;
 }
 
+///
+/// @brief extract an array of bytes from a reference byte array
+/// @param string raw string
+/// @param position starting character index
+/// @param length number of characters to extract
+/// @return
+///
 uint8_t *Substring(uint8_t *sourceArray, int position, int length)
 {
    uint8_t *pointer;
@@ -934,6 +941,9 @@ void ProcessReceivedQueries()
    // otherwise, return feedback and process the query
    else if (_queryReceived & (_messageIdentifier > 0x000))
    {
+      int period_seconds = SENSOR_SHUTDOWN_TIME;
+      bool range_error = false;
+
       // load the query string into its own string for post-processing
       char *queryBody = new char[_SerialBuffer.getLength() + 1];
       memset(queryBody, 0, _SerialBuffer.getLength() + 1);
@@ -943,7 +953,6 @@ void ProcessReceivedQueries()
       }
 
       std::string search(queryBody);
-      int period_seconds;
 
       // first we search through the NFC parameters list. One of these?
       for (size_t i = 0; i < CMWR_PARAMETER_COUNT; i++)
@@ -975,11 +984,38 @@ void ProcessReceivedQueries()
          size_t equalsPosn = search.find('=');
          if (equalsPosn != std::string::npos)
          {
-            char *time_in_seconds = Substring(queryBody, equalsPosn + 2, _SerialBuffer.getLength() - (equalsPosn + 1));
-            period_seconds = std::stoi(time_in_seconds);
+            size_t length = _SerialBuffer.getLength() - (equalsPosn + 1);
+            char *time_in_seconds = Substring(queryBody, equalsPosn + 2, length);
+
+            if (std::stoi(time_in_seconds) < 1800)
+            {
+               //
+               // first we clear all existing values from the numeric response payload
+               // by adding a set of NULL characters. It must be remembered that we only
+               // have FIVE characters to work with here!
+               //
+               for (size_t j = 3; j < sizeof(scomp_response_return_numeric) - 1; j++)
+               {
+                  scomp_response_return_numeric[j] = '\n';
+               }
+
+               // now we insert each of the characters from the numeric query value
+               period_seconds = std::stoi(time_in_seconds);
+               for (size_t i = 0; i < length; i++)
+               {
+                  scomp_response_return_numeric[3 + i] = time_in_seconds[i];
+               }
+
+               // at this point we can safely assume that everything went to plan
+               range_error = false;
+            }
+            else
+            {
+               range_error = true;
+            }
+
             free(time_in_seconds);
          }
-
          free(substr);
       }
 
@@ -1025,16 +1061,46 @@ void ProcessReceivedQueries()
             PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
             break;
 
-         case CMWR_Command::startup:
-
-            READER_DEBUG_PRINT.println(period_seconds);
-            PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+         case CMWR_Command::set_startup:
+            if (!range_error)
+            {
+               _sensor_startup_time = (uint16_t)period_seconds;
+               READER_DEBUG_PRINT.print("sensor startup time in seconds: ");
+               READER_DEBUG_PRINT.println(scomp_response_return_numeric);
+               PublishResponseToBluetooth(scomp_response_return_numeric, sizeof(scomp_response_return_numeric) - 1);
+            }
+            else
+            {
+               PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
+            }
             break;
 
-         case CMWR_Command::shutdown:
+         case CMWR_Command::set_shutdown:
+            if (!range_error)
+            {
+               _sensor_shutdown_time = (uint16_t)period_seconds;
+               READER_DEBUG_PRINT.print("sensor shutdown time in seconds: ");
+               READER_DEBUG_PRINT.println(scomp_response_return_numeric);
+               PublishResponseToBluetooth(scomp_response_return_numeric, sizeof(scomp_response_return_numeric) - 1);
+            }
+            else
+            {
+               PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
+            }
+            break;
 
-            READER_DEBUG_PRINT.println(period_seconds);
-            PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
+         case CMWR_Command::get_startup:
+            _sensor_startup_time = (uint16_t)period_seconds;
+            READER_DEBUG_PRINT.print("sensor startup time in seconds: ");
+            READER_DEBUG_PRINT.println(scomp_response_return_numeric);
+            PublishResponseToBluetooth(scomp_response_return_numeric, sizeof(scomp_response_return_numeric) - 1);
+            break;
+
+         case CMWR_Command::get_shutdown:
+            _sensor_shutdown_time = (uint16_t)period_seconds;
+            READER_DEBUG_PRINT.print("sensor shutdown time in seconds: ");
+            READER_DEBUG_PRINT.println(scomp_response_return_numeric);
+            PublishResponseToBluetooth(scomp_response_return_numeric, sizeof(scomp_response_return_numeric) - 1);
             break;
          }
       }
