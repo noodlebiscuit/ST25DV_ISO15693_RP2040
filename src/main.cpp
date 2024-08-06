@@ -1032,32 +1032,46 @@ void ProcessReceivedQueries()
          // when we have both an '=' and a '?' then we're querying for the currently
          // set values for either commissioning or shutdown times in seconds
          //
-         // else if ((equalsPosn != std::string::npos) & (queryPosn != std::string::npos))
-         // {
-         //    for (size_t j = 3; j < sizeof(scomp_response_return_numeric) - 1; j++)
-         //    {
-         //       scomp_response_return_numeric[j] = ('*');
-         //    }
+         if (((equalsPosn != std::string::npos) & (queryPosn != std::string::npos)) &
+             ((_cwwr_command == CMWR_Command::startup_time) | (_cwwr_command == CMWR_Command::shutdown_time)))
+         {
+            for (size_t j = 2; j < sizeof(scomp_response_return_numeric) - 1; j++)
+            {
+               scomp_response_return_numeric[j] = '.';
+            }
 
-         //    // convert either the startup or shutdown times into an array of characters
-         //    std::string activity_time_in_seconds;
-         //    if (_cwwr_command == CMWR_Command::startup_time)
-         //    {
-         //       activity_time_in_seconds = std::to_string(_sensor_startup_time);
-         //    }
-         //    else if (_cwwr_command == CMWR_Command::shutdown_time)
-         //    {
-         //       activity_time_in_seconds = std::to_string(_sensor_shutdown_time);
-         //    }
+            // convert either the startup or shutdown times into an array of characters
+            char *time_in_seconds = new char[6];
+            memset(time_in_seconds, 0x2e, 6);
 
-         //    // repopulate the response string
-         //    char const *time_in_seconds = activity_time_in_seconds.c_str();
-         //    for (size_t i = 0; i < sizeof(time_in_seconds); i++)
-         //    {
-         //       scomp_response_return_numeric[3 + i] = time_in_seconds[i];
-         //    }
-         //    range_error = false;
-         // }
+            if (_cwwr_command == CMWR_Command::startup_time)
+            {
+               sprintf(time_in_seconds, "%d", _sensor_startup_time);
+            }
+            else if (_cwwr_command == CMWR_Command::shutdown_time)
+            {
+               sprintf(time_in_seconds, "%d", _sensor_shutdown_time);
+            }
+
+            size_t length = 0;
+            for (int i = 0; i < 6; i++)
+            {
+               if (time_in_seconds[i] == (char)0x2e)
+               {
+                  length = i - 1;
+                  break;
+               }
+            }
+
+            size_t offset = sizeof(scomp_response_return_numeric) - (length + 1);
+            for (size_t i = 0; i < length; i++)
+            {
+               scomp_response_return_numeric[offset + i] = time_in_seconds[i];
+            }
+
+            delete[] time_in_seconds;
+            range_error = false;
+         }
 
          free(substr);
       }
