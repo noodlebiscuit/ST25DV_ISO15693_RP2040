@@ -287,26 +287,20 @@ const size_t CMWR_COMMAND_COUNT = 6;
 
 #define _READ "read"
 #define _RESET "reset"
-#define _SET_START_UP "cmsd="
-#define _SET_SHUTDOWN "ship="
-#define _GET_START_UP "getcmsd"
-#define _GET_SHUTDOWN "getship"
+#define _START_UP_PERIOD "cmsd="
+#define _SHUTDOWN_PERIOD "ship="
 
 const std::string command_prefix = "command";
 
 const char READ[] = _READ;
 const char RESET[] = _RESET;
-const char SET_START_UP[] = _SET_START_UP;
-const char SET_SHUTDOWN[] = _SET_SHUTDOWN;
-const char GET_START_UP[] = _GET_START_UP;
-const char GET_SHUTDOWN[] = _GET_SHUTDOWN;
+const char START_UP_PERIOD[] = _START_UP_PERIOD;
+const char SHUTDOWN_PERIOD[] = _SHUTDOWN_PERIOD;
 
 const std::string cmwr_command[CMWR_COMMAND_COUNT] = {READ,
                                                       RESET,
-                                                      SET_START_UP,
-                                                      SET_SHUTDOWN,
-                                                      GET_START_UP,
-                                                      GET_SHUTDOWN};
+                                                      START_UP_PERIOD,
+                                                      SHUTDOWN_PERIOD};
 
 /// @brief supported commands
 enum class CMWR_Command : uint8_t
@@ -314,10 +308,8 @@ enum class CMWR_Command : uint8_t
     none = 0x00,
     read = 0x01,
     reset = 0x02,
-    set_startup = 0x03,
-    set_shutdown = 0x04,
-    get_startup = 0x05,
-    get_shutdown = 0x06
+    startup_time = 0x03,
+    shutdown_time = 0x04,
 };
 
 //------------------------------------------------------------------------------------------------

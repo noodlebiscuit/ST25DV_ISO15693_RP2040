@@ -982,7 +982,13 @@ void ProcessReceivedQueries()
 
          // look for operand data
          size_t equalsPosn = search.find('=');
-         if (equalsPosn != std::string::npos)
+         size_t queryPosn = search.find('?');
+
+         //
+         // when we have both an '=' but not an '?' then we're looking to set either
+         // the commissioning or shutdown times in seconds
+         //
+         if ((equalsPosn != std::string::npos) & (queryPosn == std::string::npos))
          {
             size_t length = _SerialBuffer.getLength() - (equalsPosn + 1);
             char *time_in_seconds = Substring(queryBody, equalsPosn + 2, length);
@@ -1016,6 +1022,36 @@ void ProcessReceivedQueries()
 
             free(time_in_seconds);
          }
+         //
+         // when we have both an '=' and a '?' then we're querying for the currently
+         // set values for either commissioning or shutdown times in seconds
+         //
+         else if ((equalsPosn != std::string::npos) & (queryPosn != std::string::npos))
+         {
+            for (size_t j = 3; j < sizeof(scomp_response_return_numeric) - 1; j++)
+            {
+               scomp_response_return_numeric[j] = ('\n');
+            }
+
+            std::string s;
+            if (_cwwr_command == CMWR_Command::startup_time)
+            {
+               s = std::to_string(_sensor_startup_time);
+            }
+            else if (_cwwr_command == CMWR_Command::shutdown_time)
+            {
+               s = std::to_string(_sensor_shutdown_time);
+            }
+
+            char const *time_in_seconds = s.c_str();
+            for (size_t i = 0; i < sizeof(time_in_seconds); i++)
+            {
+               scomp_response_return_numeric[3 + i] = time_in_seconds[i];
+            }
+
+            range_error = false;
+         }
+
          free(substr);
       }
 
@@ -1061,7 +1097,7 @@ void ProcessReceivedQueries()
             PublishResponseToBluetooth(scomp_response_ok, sizeof(scomp_response_ok) - 1);
             break;
 
-         case CMWR_Command::set_startup:
+         case CMWR_Command::startup_time:
             if (!range_error)
             {
                _sensor_startup_time = (uint16_t)period_seconds;
@@ -1075,7 +1111,7 @@ void ProcessReceivedQueries()
             }
             break;
 
-         case CMWR_Command::set_shutdown:
+         case CMWR_Command::shutdown_time:
             if (!range_error)
             {
                _sensor_shutdown_time = (uint16_t)period_seconds;
@@ -1087,20 +1123,6 @@ void ProcessReceivedQueries()
             {
                PublishResponseToBluetooth(scomp_response_error, sizeof(scomp_response_error) - 1);
             }
-            break;
-
-         case CMWR_Command::get_startup:
-            _sensor_startup_time = (uint16_t)period_seconds;
-            READER_DEBUG_PRINT.print("sensor startup time in seconds: ");
-            READER_DEBUG_PRINT.println(scomp_response_return_numeric);
-            PublishResponseToBluetooth(scomp_response_return_numeric, sizeof(scomp_response_return_numeric) - 1);
-            break;
-
-         case CMWR_Command::get_shutdown:
-            _sensor_shutdown_time = (uint16_t)period_seconds;
-            READER_DEBUG_PRINT.print("sensor shutdown time in seconds: ");
-            READER_DEBUG_PRINT.println(scomp_response_return_numeric);
-            PublishResponseToBluetooth(scomp_response_return_numeric, sizeof(scomp_response_return_numeric) - 1);
             break;
          }
       }
