@@ -980,7 +980,10 @@ void ProcessReceivedQueries()
             }
          }
 
-         // look for operand data
+         //
+         // look for operand data - namely equals and question mark. These are used for setting
+         // (or querying) numeric values within the emulator
+         //
          size_t equalsPosn = search.find('=');
          size_t queryPosn = search.find('?');
 
@@ -988,8 +991,10 @@ void ProcessReceivedQueries()
          // when we have both an '=' but not an '?' then we're looking to set either
          // the commissioning or shutdown times in seconds
          //
-         if ((equalsPosn != std::string::npos) & (queryPosn == std::string::npos))
+         if (((equalsPosn != std::string::npos) & (queryPosn == std::string::npos)) &
+             ((_cwwr_command == CMWR_Command::startup_time) | (_cwwr_command == CMWR_Command::shutdown_time)))
          {
+            // now we extract the operand's command data payload
             size_t length = _SerialBuffer.getLength() - (equalsPosn + 1);
             char *time_in_seconds = Substring(queryBody, equalsPosn + 2, length);
 
@@ -1000,16 +1005,17 @@ void ProcessReceivedQueries()
                // by adding a set of NULL characters. It must be remembered that we only
                // have FIVE characters to work with here!
                //
-               for (size_t j = 3; j < sizeof(scomp_response_return_numeric) - 1; j++)
+               for (size_t j = 2; j < sizeof(scomp_response_return_numeric) - 1; j++)
                {
-                  scomp_response_return_numeric[j] = '\n';
+                  scomp_response_return_numeric[j] = '.';
                }
 
                // now we insert each of the characters from the numeric query value
+               size_t offset = sizeof(scomp_response_return_numeric) - (length + 1);
                period_seconds = std::stoi(time_in_seconds);
                for (size_t i = 0; i < length; i++)
                {
-                  scomp_response_return_numeric[3 + i] = time_in_seconds[i];
+                  scomp_response_return_numeric[offset + i] = time_in_seconds[i];
                }
 
                // at this point we can safely assume that everything went to plan
@@ -1019,38 +1025,39 @@ void ProcessReceivedQueries()
             {
                range_error = true;
             }
-
             free(time_in_seconds);
          }
+
          //
          // when we have both an '=' and a '?' then we're querying for the currently
          // set values for either commissioning or shutdown times in seconds
          //
-         else if ((equalsPosn != std::string::npos) & (queryPosn != std::string::npos))
-         {
-            for (size_t j = 3; j < sizeof(scomp_response_return_numeric) - 1; j++)
-            {
-               scomp_response_return_numeric[j] = ('\n');
-            }
+         // else if ((equalsPosn != std::string::npos) & (queryPosn != std::string::npos))
+         // {
+         //    for (size_t j = 3; j < sizeof(scomp_response_return_numeric) - 1; j++)
+         //    {
+         //       scomp_response_return_numeric[j] = ('*');
+         //    }
 
-            std::string s;
-            if (_cwwr_command == CMWR_Command::startup_time)
-            {
-               s = std::to_string(_sensor_startup_time);
-            }
-            else if (_cwwr_command == CMWR_Command::shutdown_time)
-            {
-               s = std::to_string(_sensor_shutdown_time);
-            }
+         //    // convert either the startup or shutdown times into an array of characters
+         //    std::string activity_time_in_seconds;
+         //    if (_cwwr_command == CMWR_Command::startup_time)
+         //    {
+         //       activity_time_in_seconds = std::to_string(_sensor_startup_time);
+         //    }
+         //    else if (_cwwr_command == CMWR_Command::shutdown_time)
+         //    {
+         //       activity_time_in_seconds = std::to_string(_sensor_shutdown_time);
+         //    }
 
-            char const *time_in_seconds = s.c_str();
-            for (size_t i = 0; i < sizeof(time_in_seconds); i++)
-            {
-               scomp_response_return_numeric[3 + i] = time_in_seconds[i];
-            }
-
-            range_error = false;
-         }
+         //    // repopulate the response string
+         //    char const *time_in_seconds = activity_time_in_seconds.c_str();
+         //    for (size_t i = 0; i < sizeof(time_in_seconds); i++)
+         //    {
+         //       scomp_response_return_numeric[3 + i] = time_in_seconds[i];
+         //    }
+         //    range_error = false;
+         // }
 
          free(substr);
       }

@@ -211,23 +211,23 @@ char scomp_rfid_response_header[] = "0000R0000#rfiddata:";
 /// @brief create the default SCANNDY PROTOCOL header for returning an OK response
 char scomp_ok_response_header[] = "0000R0000#";
 
+/// @brief scomp default response to a numeric value request
+char scomp_response_return_numeric[] = "ok.....";
+
 /// @brief scomp query and response message identifier represented as a four character long string
 char scomp_query_ID[] = "0000";
 
 /// @brief scomp default response to a successfully received and processed query
-char scomp_response_ok[] = "ok";
+const char scomp_response_ok[] = "ok";
 
 /// @brief scomp default response to a invalid processed query (E.g. wrong CRC32 value)
-char scomp_response_error[] = "error";
+const char scomp_response_error[] = "error";
 
 /// @brief scomp default response to a sensor being enabled
-char scomp_response_sensor_enabled[] = "sensor enabled";
+const char scomp_response_sensor_enabled[] = "sensor enabled";
 
 /// @brief scomp default response to a sensor being disabled
-char scomp_response_sensor_disabled[] = "sensor disabled";
-
-/// @brief scomp default response to a numeric value request
-char scomp_response_return_numeric[] = "ok      ";
+const char scomp_response_sensor_disabled[] = "sensor disabled";
 
 /// @brief sensor is commissioned
 const char *CMSD = "cmsd";
