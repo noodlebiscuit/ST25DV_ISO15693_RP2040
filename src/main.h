@@ -207,6 +207,9 @@ byte SENSOR_ENABLED[] = {0x63, 0x6d, 0x73, 0x74, 0x3a, 0x63, 0x6d, 0x73, 0x64};
 /// @brief valid EEPROM contents for sensor disabled [cmst:ship]
 byte SENSOR_DISABLED[] = {0x63, 0x6d, 0x73, 0x74, 0x3a, 0x73, 0x68, 0x69, 0x70};
 
+/// @brief valid EEPROM contents for sensor disabled [cmst:ship]
+byte SENSOR_OK[] = {0x73, 0x74, 0x73, 0x74, 0x3a, 0x4f, 0x4b};
+
 /// @brief start of an NDEF record
 byte NDEF_START[] = {0x54, 0x02, 0x65, 0x6e};
 
@@ -366,4 +369,5 @@ void SetupBLE();
 void SimulateSensor();
 void StartBLE();
 void TagDetectedInterrupt();
+void ToggleCommissioningLED();
 #pragma endregion

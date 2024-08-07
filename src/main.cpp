@@ -90,7 +90,7 @@
 
 //-------------------------------------------------------------------------------------------------
 
-#pragma region STRING MANAGEMENT AND SUPPORT
+#pragma region PRIVATE MEMBER VARIABLES
 /// @brief set true when connected via bluetooth
 volatile bool _bluetoothConnected = false;
 
@@ -105,18 +105,6 @@ volatile bool _blockReader = false;
 
 /// @brief set true with the ST25DV16 detects an RFID energy pulse
 volatile bool reader_detected = false;
-
-/// @brief set true when a sensor has been commissioned and is starting
-volatile bool sensor_starting = false;
-
-/// @brief set true when a sensor has been switched to standby mode
-volatile bool sensor_shutting_down = false;
-
-/// @brief set true when a sensor has been commissioned and is starting
-volatile bool sensor_enabled = false;
-
-/// @brief set true when a sensor has been switched to standby mode
-volatile bool sensor_disabled = false;
 
 /// @brief main IO application thread
 rtos::Thread t1;
@@ -141,9 +129,13 @@ CMWR_Command _cwwr_command = CMWR_Command::none;
 
 /// @brief represent time in seconds from sensor receiving cmd:cmsd to it starting0071Q0014#tliv:3.47 2312041113ed020960
 volatile uint8_t sensor_startup_count = 0x00;
-#pragma endregion
 
+/// @brief what is the current enable state of this sensor
 volatile CMWR_EnableState enable_status = CMWR_EnableState::disabled;
+
+/// @brief has a sensor fault been detected
+volatile bool sensor_fault = false;
+#pragma endregion
 
 //-------------------------------------------------------------------------------------------------
 
@@ -367,13 +359,20 @@ void main_thread()
       if (timerEvent & !_bluetoothConnected)
       {
          timerEvent = false;
-         if (sensor_starting)
+         switch (enable_status)
          {
-            READER_DEBUG_PRINT.print("$");
-         }
-         else
-         {
+         case CMWR_EnableState::enabled:
             READER_DEBUG_PRINT.print(".");
+            break;
+         case CMWR_EnableState::disabled:
+            READER_DEBUG_PRINT.print(".");
+            break;
+         case CMWR_EnableState::starting:
+            READER_DEBUG_PRINT.print(">");
+            break;
+         case CMWR_EnableState::stopping:
+            READER_DEBUG_PRINT.print("<");
+            break;
          }
          SimulateSensor();
       }
@@ -400,13 +399,20 @@ void bluetooth_thread()
             if (timerEvent)
             {
                timerEvent = false;
-               if (sensor_starting)
+               switch (enable_status)
                {
-                  READER_DEBUG_PRINT.print("$");
-               }
-               else
-               {
+               case CMWR_EnableState::enabled:
                   READER_DEBUG_PRINT.print("+");
+                  break;
+               case CMWR_EnableState::disabled:
+                  READER_DEBUG_PRINT.print("+");
+                  break;
+               case CMWR_EnableState::starting:
+                  READER_DEBUG_PRINT.print(">");
+                  break;
+               case CMWR_EnableState::stopping:
+                  READER_DEBUG_PRINT.print("<");
+                  break;
                }
                ProcessReceivedQueries();
                SimulateSensor();
@@ -574,9 +580,9 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 //-------------------------------------------------------------------------------------------------
 
 #pragma region READ AND WRITE TO NFC EEPROM - SIMULATE SENSOR
-
-bool _starting = false;
-
+///
+/// @brief toggle the commissioning LEDs
+///
 void ToggleCommissioningLED()
 {
    if (LED_SensorEnabled == HIGH)
@@ -627,17 +633,28 @@ void CheckSensorEnableStatus()
    tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
 
    // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
-   sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
+   bool sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
 
    // is the sensor instead shutting down? we detect this by checking for the char array 'cmd:ship'
-   sensor_shutting_down = CheckNeedle(tagRead, COMMAND_SHIP, ISO15693_USER_MEMORY, 8);
+   bool sensor_shutting_down = CheckNeedle(tagRead, COMMAND_SHIP, ISO15693_USER_MEMORY, 8);
 
    // is the sensor enabled?
-   sensor_enabled = CheckNeedle(tagRead, SENSOR_ENABLED, ISO15693_USER_MEMORY, 9);
+   bool sensor_enabled = CheckNeedle(tagRead, SENSOR_ENABLED, ISO15693_USER_MEMORY, 9);
 
    // is the sensor disabled?
-   sensor_disabled = CheckNeedle(tagRead, SENSOR_DISABLED, ISO15693_USER_MEMORY, 9);
+   bool sensor_disabled = CheckNeedle(tagRead, SENSOR_DISABLED, ISO15693_USER_MEMORY, 9);
 
+   // has a fault been detected?
+   if (!CheckNeedle(tagRead, SENSOR_OK, ISO15693_USER_MEMORY, 7))
+   {
+      LED_SensorFault = HIGH;
+   }
+   else
+   {
+      LED_SensorFault = LOW;
+   }
+
+   // now set the single enable state based on the status booleans
    if (sensor_enabled & !sensor_shutting_down)
    {
       enable_status = CMWR_EnableState::enabled;
@@ -648,11 +665,11 @@ void CheckSensorEnableStatus()
    }
    else if (sensor_enabled & sensor_shutting_down)
    {
-      enable_status = CMWR_EnableState::starting;
+      enable_status = CMWR_EnableState::stopping;
    }
    else if (sensor_disabled & sensor_starting)
    {
-      enable_status = CMWR_EnableState::stopping;
+      enable_status = CMWR_EnableState::starting;
    }
 }
 
@@ -670,7 +687,9 @@ void SimulateSensor()
       SetCommissioningLED();
 
       // if we've detected a reader, let's do some checks
-      if (reader_detected & !sensor_starting & !sensor_shutting_down)
+      if (reader_detected &
+          ((enable_status != CMWR_EnableState::starting)|
+          (enable_status != CMWR_EnableState::stopping)))
       {
          READER_DEBUG_PRINT.println(" ");
          READER_DEBUG_PRINT.println("READER DETECTED");
@@ -683,7 +702,7 @@ void SimulateSensor()
       // if the sensor is starting we initiate a countdown of 'n' seconds
       // during which time we DO NOT continue to read the EEPROM contents
       //
-      else if (sensor_starting & !sensor_shutting_down)
+      else if (enable_status == CMWR_EnableState::starting)
       {
          if (sensor_startup_count++ > _sensor_startup_time)
          {
@@ -694,8 +713,6 @@ void SimulateSensor()
             READER_DEBUG_PRINT.println("SENSOR NOW READY");
 
             sensor_startup_count = 0x00;
-            sensor_starting = false;
-            sensor_shutting_down = false;
             reader_detected = false;
             tagDetectedEvent = false;
 
@@ -711,7 +728,7 @@ void SimulateSensor()
       // the same for when the sensor is shutting down, except now we only
       // apply a nominal shutdown period of 30 seconds
       //
-      else if (!sensor_starting & sensor_shutting_down)
+      else if (enable_status == CMWR_EnableState::stopping)
       {
          if (sensor_startup_count++ > _sensor_shutdown_time)
          {
@@ -722,8 +739,6 @@ void SimulateSensor()
             READER_DEBUG_PRINT.println("SENSOR NOW DISABLED");
 
             sensor_startup_count = 0x00;
-            sensor_starting = false;
-            sensor_shutting_down = false;
             reader_detected = false;
             tagDetectedEvent = false;
 
