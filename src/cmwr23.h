@@ -26,6 +26,17 @@ enum class CMWR_Parameter : uint8_t
     stts = 0x0c
 };
 
+///
+/// @brief what is the sensor's enable state
+///
+enum class CMWR_EnableState : uint8_t
+{
+    starting = 0x00,
+    stopping = 0x01,
+    enabled = 0x02,
+    disabled = 0x03
+};
+
 class CMWR23
 {
 
