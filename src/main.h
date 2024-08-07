@@ -146,6 +146,7 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define SENSOR_STARTUP_TIME 120  // time in seconds for the CMWRxx sensor to start
 #define SENSOR_SHUTDOWN_TIME 30  // time in seconds for the CMWRxx sensor to shutdown
 #define SENSOR_IDLE_MAXIMUM 1800 // max time CMWRxx sensor can be starting up or shutting down
+#define NUMERIC_REPLY_CHARS 6    // how many characters do we allow for numeric strings?
 #define NDEF_HEADER_BYTES 5      // number of header bytes in a specific NDEF record
 #define NDEF_SEARCH_BYTES 4
 #define NDEF_FOOTER_BYTES 3
@@ -155,6 +156,28 @@ BLECharacteristic serialNumberCharacteristic(UUID_CHARACTERISTIC_SERIAL, BLERead
 #define SDA_PIN 18
 #define SCL_PIN 19
 #define WireNFC MyWire
+
+//------------------------------------------------------------------------------------------------
+
+#pragma region GPIO CONFIGURATION
+/// @brief detail which pins are allocated to I2C
+TwoWire MyWire(digitalPinToPinName(SDA_PIN), digitalPinToPinName(SCL_PIN));
+
+/// @brief  MBED* control the BLE connected pin
+DigitalOut LED_SetConnectedToBLE(digitalPinToPinName(GPIO_PIN_4));
+
+/// @brief  MBED* control the sensor commissioned state
+DigitalOut LED_SensorEnabled(digitalPinToPinName(GPIO_PIN_5));
+
+/// @brief  MBED* control the sensor commissioned state
+DigitalOut LED_SensorDisabled(digitalPinToPinName(GPIO_PIN_6));
+
+/// @brief  MBED* control the sensor commissioned state
+DigitalOut LED_SensorFault(digitalPinToPinName(GPIO_PIN_7));
+
+/// @brief  Set direct write access to GPIO PIN 3 here
+InterruptIn OnTagDetectedInterrupt(digitalPinToPinName(GPIO_PIN_9));
+#pragma endregion
 
 //------------------------------------------------------------------------------------------------
 
@@ -178,17 +201,14 @@ byte COMMAND_CMSD[] = {0x63, 0x6d, 0x64, 0x3a, 0x63, 0x6d, 0x73, 0x64};
 /// @brief ship command written to sensor
 byte COMMAND_SHIP[] = {0x63, 0x6d, 0x64, 0x3a, 0x73, 0x68, 0x69, 0x70};
 
+/// @brief valid EEPROM contents for sensor commissioned [cmst:cmsd]
+byte SENSOR_ENABLED[] = {0x63, 0x6d, 0x73, 0x74, 0x3a, 0x63, 0x6d, 0x73, 0x64};
+
+/// @brief valid EEPROM contents for sensor disabled [cmst:ship]
+byte SENSOR_DISABLED[] = {0x63, 0x6d, 0x73, 0x74, 0x3a, 0x73, 0x68, 0x69, 0x70};
+
 /// @brief start of an NDEF record
 byte NDEF_START[] = {0x54, 0x02, 0x65, 0x6e};
-
-/// @brief detail which pins are allocated to I2C
-TwoWire MyWire(digitalPinToPinName(SDA_PIN), digitalPinToPinName(SCL_PIN));
-
-/// @brief  MBED* control the BLE connected pin
-DigitalOut LED_SetConnectedToBLE(digitalPinToPinName(GPIO_PIN_4));
-
-/// @brief  Set direct write access to GPIO PIN 3 here
-InterruptIn OnTagDetectedInterrupt(digitalPinToPinName(GPIO_PIN_9));
 
 /// @brief  when set true, we need to block all other I/O activites
 volatile bool _readerBusy = false;
@@ -316,6 +336,7 @@ enum class CMWR_Command : uint8_t
 
 #pragma region METHOD PROTOTYPES
 bool CheckNeedle(uint8_t *, uint8_t *, size_t, size_t);
+void CheckSensorEnableStatus();
 bool CompareTagIdentifier(uint8_t *);
 char *Substring(char *, int, int);
 const char *HexStr(const uint8_t *, int, bool);
@@ -339,6 +360,7 @@ void publish_tag();
 void PublishHardwareDetails();
 void PublishResponseToBluetooth(const char *, size_t);
 void ResetReader();
+void SetCommissioningLED();
 void SetTagIdentifier(uint8_t *);
 void SetupBLE();
 void SimulateSensor();

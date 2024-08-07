@@ -112,6 +112,12 @@ volatile bool sensor_starting = false;
 /// @brief set true when a sensor has been switched to standby mode
 volatile bool sensor_shutting_down = false;
 
+/// @brief set true when a sensor has been commissioned and is starting
+volatile bool sensor_enabled = false;
+
+/// @brief set true when a sensor has been switched to standby mode
+volatile bool sensor_disabled = false;
+
 /// @brief main IO application thread
 rtos::Thread t1;
 
@@ -566,6 +572,65 @@ const char *HexStr(const uint8_t *data, int len, bool uppercase)
 //-------------------------------------------------------------------------------------------------
 
 #pragma region READ AND WRITE TO NFC EEPROM - SIMULATE SENSOR
+
+bool _starting = false;
+
+///
+/// @brief simulate the actions of a real sensor. We support both activation and deactivation
+///
+void SetCommissioningLED()
+{
+
+   if ((!sensor_starting & !sensor_shutting_down) & sensor_enabled & !sensor_disabled)
+   {
+      LED_SensorEnabled = HIGH;
+      LED_SensorDisabled = LOW;
+   }
+   else if ((!sensor_starting & !sensor_shutting_down) & !sensor_enabled & sensor_disabled)
+   {
+      LED_SensorEnabled = LOW;
+      LED_SensorDisabled = HIGH;
+   }
+   else
+   {
+      if (_starting)
+      {
+         LED_SensorEnabled = HIGH;
+         LED_SensorDisabled = LOW;
+      }
+      else
+      {
+         LED_SensorEnabled = LOW;
+         LED_SensorDisabled = HIGH;
+      }
+      _starting = !_starting;
+   }
+}
+
+///
+/// @brief What is the current operational status of this sensor?
+///
+void CheckSensorEnableStatus()
+{
+         // Read 16 bytes from EEPROM location 0x0
+      uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
+
+      // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
+      tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
+
+      // is the sensor enabled?
+      sensor_enabled = CheckNeedle(tagRead, SENSOR_ENABLED, ISO15693_USER_MEMORY, 9);
+
+      // is the sensor disabled?
+      sensor_disabled = CheckNeedle(tagRead, SENSOR_DISABLED, ISO15693_USER_MEMORY, 9);
+
+      // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
+      sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
+
+      // is the sensor instead shutting down? we detect this by checking for the char array 'cmd:ship'
+      sensor_shutting_down = CheckNeedle(tagRead, COMMAND_SHIP, ISO15693_USER_MEMORY, 8);
+}
+
 ///
 /// @brief simulate the actions of a real sensor. We support both activation and deactivation
 ///
@@ -573,6 +638,13 @@ void SimulateSensor()
 {
    if (!_readerBusy)
    {
+      // check the operational status of this sensor
+      CheckSensorEnableStatus();
+
+      // set the LED states
+      SetCommissioningLED();
+
+      // if we've detected a reader, let's do some checks
       if (reader_detected & !sensor_starting & !sensor_shutting_down)
       {
          READER_DEBUG_PRINT.println(" ");
@@ -580,18 +652,6 @@ void SimulateSensor()
 
          // reset the reader detected flag
          reader_detected = false;
-
-         // Read 16 bytes from EEPROM location 0x0
-         uint8_t tagRead[ISO15693_USER_MEMORY] = {0};
-
-         // Read the EEPROM: start at address 0x00, read contents into tagRead; read 16 bytes
-         tag.readEEPROM(0x00, tagRead, ISO15693_USER_MEMORY);
-
-         // is the sensor starting? we detect this by checking for the char array 'cmd:cmsd'
-         sensor_starting = CheckNeedle(tagRead, COMMAND_CMSD, ISO15693_USER_MEMORY, 8);
-
-         // is the sensor instead shutting down? we detect this by checking for the char array 'cmd:ship'
-         sensor_shutting_down = CheckNeedle(tagRead, COMMAND_SHIP, ISO15693_USER_MEMORY, 8);
       }
 
       //
@@ -1041,9 +1101,8 @@ void ProcessReceivedQueries()
             }
 
             // convert either the startup or shutdown times into an array of characters
-            char *time_in_seconds = new char[6];
-            memset(time_in_seconds, 0x2e, 6);
-
+            char *time_in_seconds = new char[NUMERIC_REPLY_CHARS];
+            memset(time_in_seconds, 0x2e, NUMERIC_REPLY_CHARS);
             if (_cwwr_command == CMWR_Command::startup_time)
             {
                sprintf(time_in_seconds, "%d", _sensor_startup_time);
@@ -1053,8 +1112,12 @@ void ProcessReceivedQueries()
                sprintf(time_in_seconds, "%d", _sensor_shutdown_time);
             }
 
+            //
+            // now we need to determine how many of the characters available for the integer value
+            // are actually needed (with all non-numeric characters being '.')
+            //
             size_t length = 0;
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < NUMERIC_REPLY_CHARS; i++)
             {
                if (time_in_seconds[i] == (char)0x2e)
                {
@@ -1063,16 +1126,17 @@ void ProcessReceivedQueries()
                }
             }
 
+            // OK, so now where to we start appending the numeric characters?
             size_t offset = sizeof(scomp_response_return_numeric) - (length + 1);
             for (size_t i = 0; i < length; i++)
             {
                scomp_response_return_numeric[offset + i] = time_in_seconds[i];
             }
 
+            // time to release some resources
             delete[] time_in_seconds;
             range_error = false;
          }
-
          free(substr);
       }
 
