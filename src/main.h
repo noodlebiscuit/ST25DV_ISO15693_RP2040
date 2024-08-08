@@ -247,10 +247,10 @@ const char scomp_response_ok[] = "ok";
 const char scomp_response_error[] = "error";
 
 /// @brief scomp default response to a sensor being enabled
-const char scomp_response_sensor_enabled[] = "sensor enabled";
+const char scomp_response_sensor_enabled[] = "cmsd";
 
 /// @brief scomp default response to a sensor being disabled
-const char scomp_response_sensor_disabled[] = "sensor disabled";
+const char scomp_response_sensor_disabled[] = "ship";
 
 /// @brief sensor is commissioned
 const char *CMSD = "cmsd";
