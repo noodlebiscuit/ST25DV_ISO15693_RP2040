@@ -43,8 +43,8 @@ using namespace std::chrono;
 #define UUID_CHARACTERISTIC_MANUFACTURER "00002A29-0000-1000-8000-00805f9b34fb" // manufacturers name for device information service
 
 // device characteristics
-#define LOCAL_NAME_OF_PERIPHERAL "CMWR24 NFC Emulator"
-#define PERIPERHAL_DEVICE_NAME "CMWR24 NFC Emulator"
+#define LOCAL_NAME_OF_PERIPHERAL "CMWR23 NFC Emulator"
+#define PERIPERHAL_DEVICE_NAME "CMWR23 NFC Emulator"
 #define MANUFACTURER_NAME_STRING "SKF (UK) Ltd"
 #define MODEL_NAME_STRING "SKF Insight Rail"
 #define HARDWARE_NAME_STRING "Emulator by SKF (UK)"
