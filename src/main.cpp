@@ -307,6 +307,9 @@ void setup()
 {
    READER_DEBUG_PRINT.begin(SERIAL_BAUD_RATE);
 
+   // before we do anything, test the LEDS
+   Test_LEDS();
+
    // attach interrupt handler to the received ST25DV GPO signal
    OnTagDetectedInterrupt.fall(&TagDetectedInterrupt);
 
@@ -347,6 +350,42 @@ void setup()
 
    // set the timeout value
    timer.attach(&AtTime, TICK_RATE_MS);
+}
+
+///
+/// @brief simple test that ensures cycles through each of the four LEDs
+///
+void Test_LEDS()
+{
+   LED_SensorFault = HIGH;
+   LED_SensorDisabled = LOW;
+   LED_SensorEnabled = LOW;
+   LED_SetConnectedToBLE = LOW;
+   delay(330);
+
+   LED_SensorFault = HIGH;
+   LED_SensorDisabled = HIGH;
+   LED_SensorEnabled = LOW;
+   LED_SetConnectedToBLE = LOW;
+   delay(330);
+
+   LED_SensorFault = HIGH;
+   LED_SensorDisabled = HIGH;
+   LED_SensorEnabled = HIGH;
+   LED_SetConnectedToBLE = LOW;
+   delay(330);
+
+   LED_SensorFault = HIGH;
+   LED_SensorDisabled = HIGH;
+   LED_SensorEnabled = HIGH;
+   LED_SetConnectedToBLE = HIGH;
+   delay(330);
+
+   LED_SensorFault = LOW;
+   LED_SensorDisabled = LOW;
+   LED_SensorEnabled = LOW;
+   LED_SetConnectedToBLE = LOW;
+   delay(330);
 }
 
 ///
@@ -688,8 +727,8 @@ void SimulateSensor()
 
       // if we've detected a reader, let's do some checks
       if (reader_detected &
-          ((enable_status != CMWR_EnableState::starting)|
-          (enable_status != CMWR_EnableState::stopping)))
+          ((enable_status != CMWR_EnableState::starting) |
+           (enable_status != CMWR_EnableState::stopping)))
       {
          READER_DEBUG_PRINT.println(" ");
          READER_DEBUG_PRINT.println("READER DETECTED");

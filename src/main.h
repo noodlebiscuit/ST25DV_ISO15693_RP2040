@@ -369,5 +369,6 @@ void SetupBLE();
 void SimulateSensor();
 void StartBLE();
 void TagDetectedInterrupt();
+void Test_LEDS();
 void ToggleCommissioningLED();
 #pragma endregion
